@@ -9,14 +9,28 @@
 #define DIRECTIVES_H_
 
 # define M_PI  3.14159265358979323846
-//# define APM_IP1 "192.168.1.113"
-//# define APM_IP2 "192.168.1.115"
 
 # define APM_IP1 "192.168.0.100"
-# define APM_IP2 "192.168.0.102"
+# define APM_PORT1 5678
 
-# define APM_PORT1 6789
+# define APM_IP2 "127.0.0.1"
 # define APM_PORT2 7890
+
+# define APM_IP3 "127.0.0.1"
+# define APM_PORT3 5678
+
+# define APM_IP4 "127.0.0.1"
+# define APM_PORT4 4567
+
+
+//# define APM_IP1 "192.168.0.102"
+//# define APM_PORT1 6789
+//
+//# define APM_IP2 "192.168.0.100"
+//# define APM_PORT2 7890
+//
+//# define APM_IP3 "192.168.0.103"
+//# define APM_PORT3 5678
 
 
 

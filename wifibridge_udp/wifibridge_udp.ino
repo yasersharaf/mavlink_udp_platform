@@ -37,9 +37,9 @@ const int port = 6789; // and this port
 
 #ifdef MODE_STA
 // For STATION mode:
-const char *ssid = "DG1670A22";  // Your ROUTER SSID
-const char *pw = "DG1670ACA8822"; // and WiFi PASSWORD
-const int port = 7890;
+const char *ssid = "OpenWrt";  // Your ROUTER SSID
+const char *pw = ""; // and WiFi PASSWORD
+const int port = 6789;
 // You must connect the phone to the same router,
 // Then somehow find the IP that the ESP got from router, then:
 // menu -> connect -> Internet(TCP) -> [ESP_IP]:9876
@@ -49,7 +49,7 @@ const int port = 7890;
 // For STATION mode:
 const char *ssid = "ABCD";  // Your ROUTER SSID
 const char *pw = "dcds2011"; // and WiFi PASSWORD
-const int port = 7890;
+const int port = 5678;
 // You must connect the phone to the same router,
 // Then somehow find the IP that the ESP got from router, then:
 // menu -> connect -> Internet(TCP) -> [ESP_IP]:9876
@@ -103,7 +103,8 @@ void setup() {
   // from RoboRemo you must connect to the IP of the ESP
   WiFi.mode(WIFI_STA);
   
-  WiFi.begin(ssid, pw);
+//  WiFi.begin(ssid, pw);
+  WiFi.begin(ssid);
   while (WiFi.status() != WL_CONNECTED) {
     delay(100);
   }
@@ -171,7 +172,7 @@ void loop() {
   int packetSize = udp.parsePacket();
   if(packetSize>0) {
     remoteIp = udp.remoteIP(); // store the ip of the remote device
-//    digitalWrite(LED_BUILTIN, HIGH);
+    digitalWrite(LED_BUILTIN, HIGH);
     
     udp.read(buf1, bufferSize);
     // now send to UART:

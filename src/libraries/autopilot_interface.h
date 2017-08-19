@@ -66,6 +66,7 @@
 
 
 
+
 // ------------------------------------------------------------------------------
 //   Defines
 // ------------------------------------------------------------------------------
@@ -249,7 +250,7 @@ public:
 
 	Autopilot_Interface();
 	Autopilot_Interface(Client *client_);
-	Autopilot_Interface(UDP_Client* udp_client_);
+	Autopilot_Interface(UDP_Client& udp_client_);
 	~Autopilot_Interface();
 
 	char reading_status;
@@ -271,8 +272,12 @@ public:
 	mavlink_set_position_target_local_ned_t initial_position;
 	mavlink_gps_raw_int_t current_gps;
 	__mavlink_vicon_position_estimate_t current_mocap_value;
+	__mavlink_vicon_position_estimate_t previous_mocap_value;
+	__mavlink_vicon_position_estimate_t received_mocap_value;
 	__mavlink_sim_state_t Mocap_Value;
 	int vicon_message_counter = 0;
+
+
 
 	void update_setpoint(mavlink_set_position_target_local_ned_t setpoint);
 	void read_messages();

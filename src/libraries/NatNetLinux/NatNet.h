@@ -96,7 +96,8 @@ public:
       if( sd < 0 )
       {
          std::cerr << "Could not open socket. Error: " << errno << std::endl;
-         exit(1);
+         return -1;
+//         exit(1);
       }
       
       // Bind socket to the address.
@@ -105,7 +106,8 @@ public:
       {
          std::cerr << "Could not bind socket. Error: " << errno << std::endl;
          close(sd);
-         exit(1);
+         return -1;
+//         exit(1);
       }
       
       int value = 1;
@@ -114,7 +116,8 @@ public:
       {
          std::cerr << "Could not set socket to broadcast mode. Error: " << errno << std::endl;
          close(sd);
-         exit(1);
+         return -1;
+//         exit(1);
       }
       
       setsockopt(sd, SOL_SOCKET, SO_RCVBUF, (char*)&rcvBufSize, sizeof(rcvBufSize));

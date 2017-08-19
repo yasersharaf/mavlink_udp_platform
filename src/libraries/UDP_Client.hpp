@@ -31,28 +31,35 @@
  or in the same folder as this source file */
 #include "mavlink/v1.0/common/mavlink.h"
 
+using namespace std;
+
 
 
 
 class UDP_Client{
 public:
 	UDP_Client();
-	UDP_Client(std::string,uint16_t,uint16_t);
+	UDP_Client(std::string,int,uint16_t);
 	~UDP_Client();
 	int get_sock();
 	uint64_t microsSinceEpoch();
 	uint16_t write_message(const mavlink_message_t &message);
 	ssize_t read_message(mavlink_message_t &message);
+	void connect();
+	void disconnect();
+	void handle_quit(int sig);
 	int status;
-private:
+	int  port;
+	private:
 
 	char target_ip[15];
-	uint16_t  port;
+
 	struct sockaddr_in gcAddr;
 	struct sockaddr_in locAddr;
 	int sock;
 	static const unsigned int buffer_length = 300;
 	uint16_t udp_id;
+
 };
 
 

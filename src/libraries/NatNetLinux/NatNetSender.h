@@ -92,6 +92,8 @@ public:
       _natNetVersion[1] = data[5];
       _natNetVersion[2] = data[6];
       _natNetVersion[3] = data[7];
+      printf("ver: %d,%d,%d,%d\n:",_version[0],_version[1],_version[2],_version[3]);
+      printf("natver: %d,%d,%d,%d\n:",_natNetVersion[0],_natNetVersion[1],_natNetVersion[2],_natNetVersion[3]);
    }
    
 private:

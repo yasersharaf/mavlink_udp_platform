@@ -210,7 +210,7 @@ Autopilot_Interface::Autopilot_Interface(Client* client_){
 	client = client_; // client port management object
 }
 
-Autopilot_Interface::Autopilot_Interface(UDP_Client* udp_client_){
+Autopilot_Interface::Autopilot_Interface(UDP_Client& udp_client_){
 	// initialize attributes
 	write_count = 0;
 
@@ -228,8 +228,12 @@ Autopilot_Interface::Autopilot_Interface(UDP_Client* udp_client_){
 
 	current_messages.sysid  = system_id;
 	current_messages.compid = autopilot_id;
+	std::cout<<udp_client_.port<<std::endl;
 
-	udp_client = udp_client_; // client port management object
+	udp_client = &udp_client_; // client port management object
+	std::cout<<udp_client->port<<std::endl;
+
+
 }
 
 Autopilot_Interface::
@@ -267,6 +271,10 @@ read_messages()
 		// ----------------------------------------------------------------------
 		mavlink_message_t message;
 		success = udp_client->read_message(message);
+		if(message.msgid==MAVLINK_MSG_ID_VICON_POSITION_ESTIMATE)
+		{
+			mavlink_msg_vicon_position_estimate_decode(&message, &received_mocap_value);
+		}
 
 		// ----------------------------------------------------------------------
 		//   HANDLE MESSAGE
@@ -543,35 +551,35 @@ write_mocap_floats()
 
 
 
-//    if (vicon_message_counter<=10){
-// 	   pos_est.usec = 2;
-// 	   pos_est.x=500;
-// 	   pos_est.y=600;
-// 	   pos_est.z=0;
-//
-// 	   pos_est.roll=600;
-// 	   pos_est.pitch=500;
-// 	   pos_est.yaw=0;
-//    }
-//
-//    if (vicon_message_counter>=11 && vicon_message_counter<=20){
-// 	   pos_est.usec = 3;
-// 	   pos_est.x=592;
-// 	   pos_est.y=616;
-// 	   pos_est.z=642;
-//
-// 	   pos_est.roll=0;
-// 	   pos_est.pitch=0;
-// 	   pos_est.yaw=0;
-//    }
-//           printf("---%ld \n\n",pos_est.usec);
-//       printf("%f \t  %f \t  %f \t %f \t  %f \t  %f \n\n",pos_est.x,pos_est.y,pos_est.z,pos_est.pitch,pos_est.roll, pos_est.yaw);
+    if (vicon_message_counter<=10){
+ 	   pos_est.usec = 2;
+ 	   pos_est.x=1100.0;
+ 	   pos_est.y=900.0;
+ 	   pos_est.z=0.0;
+
+ 	   pos_est.roll=0.2;
+ 	   pos_est.pitch=0.6;
+ 	   pos_est.yaw=0.0;
+    }
+
+    if (vicon_message_counter>=11 && vicon_message_counter<=20){
+ 	   pos_est.usec = 3;
+ 	   pos_est.x=0.295;
+ 	   pos_est.y=0.325;
+ 	   pos_est.z=0.348;
+
+ 	   pos_est.roll=0;
+ 	   pos_est.pitch=0;
+ 	   pos_est.yaw=0;
+    }
+           printf("---%ld \n\n",pos_est.usec);
+       printf("%f \t  %f \t  %f \t %f \t  %f \t  %f \n\n",pos_est.x,pos_est.y,pos_est.z,pos_est.pitch,pos_est.roll, pos_est.yaw);
 
        mavlink_message_t message;
 
        mavlink_msg_vicon_position_estimate_encode(system_id, companion_id, &message, &pos_est);
-//       mavlink_msg_sim_state_encode(system_id, companion_id, &message, &allposes)
        vicon_message_counter++;
+//       printf("vicon message Counter: %f",vicon_message_counter);
 
 
 
@@ -584,7 +592,7 @@ write_mocap_floats()
        // do the write
        int len = 0;
        len = write_message(message);
-
+       std::cout<<len<<std::endl;
        // check the write
        if ( len <= 0 )
                fprintf(stderr,"WARNING: could not send MOCAP value \n");
@@ -701,10 +709,12 @@ void
 Autopilot_Interface::
 start()
 {
+	printf("Autopilot_Interface starting ...");
 	int result;
+	udp_client->connect();
 
 	// --------------------------------------------------------------------------
-	//   CHECK TCP PORT
+	//   CHECK TCP/UDP PORT
 	// --------------------------------------------------------------------------
 
 //	if ( client->status != 1 ) // PORT_OPEN
@@ -934,7 +944,7 @@ read_thread()
 		read_messages();
 		// Print local position NED
 		printf("NED_x: %f, NED_y: %f, NED_z: %f",current_messages.local_position_ned.x,current_messages.local_position_ned.y,current_messages.local_position_ned.z);
-		usleep(100); // Read batches at 50Hz
+		usleep(200); // Read batches at 50Hz
 	}
 
 	reading_status = false;
@@ -963,7 +973,9 @@ write_thread(void)
 	timeLastWrittenMsg = get_time_usec();
 	while ( !time_to_exit )
 	{
-		usleep(2e4);   // Stream at 50HZ
+//		1/write_frequncy
+		usleep(5e4);   // Stream at 50HZ
+
 //		write_gps_raw_int();
 
 		write_mocap_floats();

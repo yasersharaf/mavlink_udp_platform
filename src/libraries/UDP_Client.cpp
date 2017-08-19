@@ -7,12 +7,40 @@
 
 
 #include "UDP_Client.hpp"
-UDP_Client::UDP_Client(std::string str,uint16_t port_num, uint16_t id){
+UDP_Client::UDP_Client(std::string str,int port_num, uint16_t id){
 	strcpy(target_ip, str.c_str());
 	port = port_num;
 	udp_id = id;
 	std::cout<<"ip:"<<target_ip<<"\t port:"<<port<<std::endl;
 
+	status = PORT_CLOSED;
+}
+
+UDP_Client::~UDP_Client(){
+	disconnect();
+
+}
+
+int UDP_Client::get_sock(){
+	return sock;
+}
+
+uint64_t UDP_Client::microsSinceEpoch()
+{
+
+	struct timeval tv;
+
+	uint64_t micros = 0;
+
+	gettimeofday(&tv, NULL);
+	micros =  ((uint64_t)tv.tv_sec) * 1000000 + tv.tv_usec;
+
+	return micros;
+}
+
+void UDP_Client::connect(){
+
+	printf("client %d connecing ...",udp_id);
 
 	memset(&locAddr, 0, sizeof(locAddr));
 	locAddr.sin_family = AF_INET;
@@ -40,29 +68,10 @@ UDP_Client::UDP_Client(std::string str,uint16_t port_num, uint16_t id){
 		close(sock);
 		exit(EXIT_FAILURE);
 	}
+
 	status = PORT_OPEN;
-}
 
-UDP_Client::~UDP_Client(){
-	close(sock);
-	status = PORT_CLOSED;
-}
 
-int UDP_Client::get_sock(){
-	return sock;
-}
-
-uint64_t UDP_Client::microsSinceEpoch()
-{
-
-	struct timeval tv;
-
-	uint64_t micros = 0;
-
-	gettimeofday(&tv, NULL);
-	micros =  ((uint64_t)tv.tv_sec) * 1000000 + tv.tv_usec;
-
-	return micros;
 }
 
 uint16_t UDP_Client:: write_message(const mavlink_message_t &msg){
@@ -135,6 +144,7 @@ ssize_t UDP_Client::read_message(mavlink_message_t &msg){
 //						printf("%ld\n",vicon_message.usec);
 //						printf("%lld\n",rcpt_time);
 						printf("delay %u = %lld\n",udp_id,rcpt_time-vicon_message.usec);
+
 						break;
 					}
 				}
@@ -145,4 +155,31 @@ ssize_t UDP_Client::read_message(mavlink_message_t &msg){
 
 	memset(buf, 0, buffer_length);
 	return recsize;
+}
+
+void UDP_Client::disconnect(){
+
+    try {
+        close(sock);
+    	status = PORT_CLOSED;
+    }
+    catch (int error) {
+        fprintf(stderr,"Warning, could not close socket\n");
+    }
+
+
+
+}
+
+void UDP_Client::handle_quit(int sig) {
+
+    try {
+        disconnect();
+    }
+    catch (int error) {
+        fprintf(stderr,"Warning, could not close udp port\n");
+    }
+
+
+
 }
