@@ -34,7 +34,18 @@
 #include "libraries/gnuplot-iostream.h"
 #include <fstream>
 
+//for autIP
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <ifaddrs.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <linux/if_link.h>
 
+//threads for printFrames:
+#include <thread>         // std::thread
 
 timeval current_time;
 float elapsed_time = 0;
@@ -45,8 +56,13 @@ std::vector<float> y_hist;
 std::vector<float> z_hist;
 std::vector<std::pair<double,double>> data;
 std::vector<std::pair<double,double>> data2;
+std::vector<std::pair<double,double>> dataxy;
 
 std::ofstream logFile;
+uint64_t platform_epoch = 0;
+
+
+
 
 
 
@@ -64,12 +80,14 @@ public:
 	static bool run;
 	static bool haveServerIP;
 	static bool haveLocalIP;
+	static bool obtainedIP;
 };
 uint32_t Globals::localAddress = 0;
 uint32_t Globals::serverAddress = 0;
 bool Globals::run = false;
 bool Globals::haveServerIP = false;
 bool Globals::haveLocalIP = false;
+bool Globals::obtainedIP = true;
 
 // End the program gracefully.
 void terminate(int) {
@@ -77,13 +95,52 @@ void terminate(int) {
 	Globals::run = false;
 }
 
-std::string shellRun(std::string cmd) {
-//	std::cout<<(cmd+" > myIP.out")<<std::endl;
-//	system((cmd+"> myIP.out").c_str());
-//	 std::ifstream file("my_file");
-//	 std::string temp;
-//	 std::getline(file, temp);
-//	 std::cout<<temp<<std::endl;
+std::string getIP(char* netType)
+{
+	struct ifaddrs *ifaddr, *ifa;
+	int family, s, n;
+	char host[NI_MAXHOST];
+
+	if (getifaddrs(&ifaddr) == -1) {
+		perror("getifaddrs");
+		printf("Failed to obtain ip!\n");
+	}
+
+	/* Walk through linked list, maintaining head pointer so we
+              can free list later */
+
+	for (ifa = ifaddr, n = 0; ifa != NULL; ifa = ifa->ifa_next, n++) {
+		if (ifa->ifa_addr == NULL)
+			continue;
+
+		family = ifa->ifa_addr->sa_family;
+
+
+		/* For an AF_INET* interface address, display the address */
+
+		if (family == AF_INET ) {
+
+			/* Display interface name and family (including symbolic
+	                  form of the latter for the common families) */
+			if (strncmp(netType,ifa->ifa_name,1)==0){
+//				printf("this is the case:");
+				printf("%-8s \n", ifa->ifa_name);
+				s = getnameinfo(ifa->ifa_addr,
+						(family == AF_INET) ? sizeof(struct sockaddr_in) :
+								sizeof(struct sockaddr_in6),
+								host, NI_MAXHOST,
+								NULL, 0, NI_NUMERICHOST);
+				freeifaddrs(ifaddr);
+				return std::string(host);
+
+				if (s != 0) {
+					printf("Failed to obtain ip Automatically!\n");
+				}
+//				printf("\t\taddress: <%s>\n", host);
+			}
+		}
+	}
+	return "127.0.0.1";
 }
 
 // This thread loop just prints frames as they arrive.
@@ -92,12 +149,18 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 	MocapFrame frame;
 	Globals::run = true;
     Gnuplot gp;
+    Gnuplot gpxy;
+	gpxy << "set xrange [-4:4]\nset yrange [-5:5]\n";
+	gpxy << "set size ratio -1\n";
+
+
     int readFromMocapCounter = 0; //for gnu
 //	  gp.close();
 
 	logFile.open("log.txt");
 
 	while (Globals::run) {
+		//TODO:::
 		MocapFrame frame(frameListener.pop(&valid).first);
 		// Quit if the listener has no more frames.
 //		if (!valid)
@@ -106,7 +169,7 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 
 		std::vector<RigidBody> const& rBodies = frame.rigidBodies();
 //		uint16_t numerOfBodies = rBodies.size();
-
+//TODO:::
 		if (rBodies.size()<api.size()){
 			fprintf (stderr, "Rigid bodies less than ap interfaces!\n");
 			std::cout<<"num ap inter: "<<api.size()<<"num rigid bodies: "<<rBodies.size()<<std::endl;
@@ -123,43 +186,64 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 		float dt =0;
 		uint64_t u_dt = 0;
 		for(uint16_t api_ctr =0; api_ctr<api.size();api_ctr++){
+//TODO:::
 			quat2Euler(rBodies[api_ctr].orientation().qx,rBodies[api_ctr].orientation().qy,rBodies[api_ctr].orientation().qz,rBodies[api_ctr].orientation().qw, roll, pitch, yaw);
-			api[api_ctr].current_mocap_value.usec = get_time_usec();
-			api[api_ctr].current_mocap_value.x = cos(M_PI/180*yaw)*rBodies[api_ctr].location().z +  sin(M_PI/180*yaw)*rBodies[api_ctr].location().x;
-			api[api_ctr].current_mocap_value.y = -sin(M_PI/180*yaw)*rBodies[api_ctr].location().z +  cos(M_PI/180*yaw)*rBodies[api_ctr].location().x;
+			api[api_ctr].mocap_yaw = yaw;
+			api[api_ctr].current_mocap_value.usec = ((uint64_t((yaw+2*M_PI)*1e4)))*10;
+			std::cout<<"yaw: "<<api[api_ctr].current_mocap_value.usec<<" yaw: "<<yaw<<std::endl;
+//			api[api_ctr].current_mocap_value.x = cos(M_PI/180*yaw)*rBodies[api_ctr].location().z +  sin(M_PI/180*yaw)*rBodies[api_ctr].location().x;
+//			api[api_ctr].current_mocap_value.y = -sin(M_PI/180*yaw)*rBodies[api_ctr].location().z +  cos(M_PI/180*yaw)*rBodies[api_ctr].location().x;
+//			api[api_ctr].current_mocap_value.z = rBodies[api_ctr].location().y;
+			api[api_ctr].current_mocap_value.x = rBodies[api_ctr].location().z;
+			api[api_ctr].current_mocap_value.y = rBodies[api_ctr].location().x;
 			api[api_ctr].current_mocap_value.z = rBodies[api_ctr].location().y;
-			u_dt = api[api_ctr].current_mocap_value.usec - api[api_ctr].previous_mocap_value.usec;
+
+//						api[api_ctr].current_mocap_value.usec = get_time_usec();
+//						api[api_ctr].current_mocap_value.x = rand();
+//						api[api_ctr].current_mocap_value.y = rand();
+//						api[api_ctr].current_mocap_value.z = rand();
+			u_dt = get_time_usec() - api[api_ctr].previous_mocap_value.usec;
 			dt = (float)(u_dt/1e6);
-//			printf("dt = %f \n",dt);
+			printf("dt = %f \n",dt);
 			api[api_ctr].current_mocap_value.pitch = (api[api_ctr].current_mocap_value.x-api[api_ctr].previous_mocap_value.x)/dt;
 			api[api_ctr].current_mocap_value.roll = (api[api_ctr].current_mocap_value.y-api[api_ctr].previous_mocap_value.y)/dt;
 			api[api_ctr].current_mocap_value.yaw =  (api[api_ctr].current_mocap_value.z-api[api_ctr].previous_mocap_value.z)/dt;
-
+//			api[api_ctr].current_mocap_value.pitch = pitch;
+//			api[api_ctr].current_mocap_value.roll = roll;
+//			api[api_ctr].current_mocap_value.yaw = yaw;
 			api[api_ctr].previous_mocap_value = api[api_ctr].current_mocap_value;
+			api[api_ctr].previous_mocap_value.usec = get_time_usec();
 
-			logFile<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\n";
-			std::cout<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\n";
+			logFile<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\n";
+//			std::cout<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\n";
 //			printf("%f\t%f\t%f\n",api[api_ctr].current_mocap_value.x,api[api_ctr].current_mocap_value.y,api[api_ctr].current_mocap_value.z);
 
-//			data.emplace_back(readFromMocapCounter,api[api_ctr].current_mocap_value.x);
-//			data2.emplace_back(readFromMocapCounter,api[api_ctr].current_mocap_value.y);
-//
-//			//plottingdata
-//
-//			if(data.size()>700){
-//			data.erase(data.begin());
-//			data2.erase(data2.begin());
-//			}
-//			gp << "set grid;set autoscale fix;plot'-' tit 'X' with line,'-' tit 'Y' with line\n";
-//
-//			gp.send1d(data);
-//			gp.send1d(data2);
-//
-//			readFromMocapCounter++;
+			//plottingdata
+			if (readFromMocapCounter%11==0){
+
+				data.emplace_back(readFromMocapCounter,api[api_ctr].current_mocap_value.x);
+				data2.emplace_back(readFromMocapCounter,api[api_ctr].current_mocap_value.y);
+				dataxy.emplace_back(rBodies[api_ctr].location().z,rBodies[api_ctr].location().x);
+
+
+				if(data.size()>500){
+				data.erase(data.begin());
+				data2.erase(data2.begin());
+				dataxy.erase(dataxy.begin());
+				}
+				gp << "set grid;set autoscale fix;plot'-' tit 'X' with line,'-' tit 'Y' with line\n";
+				gpxy << "set grid;set autoscale fix;plot'-' tit 'XY' \n";
+//				std::cout<<data.size()<<"\t"<<data.size()<<"\t"<<data.size()<<"\t"<<data.size()<<"\t"<<data.size()<<std::endl;
+				gp.send1d(data);
+				gp.send1d(data2);
+				gpxy.send1d(dataxy);
+			}
+			readFromMocapCounter++;
 			usleep(20000);
 		}
 
 	}
+	printf("\nEnded autopilot belief updater!\n");
 }
 
 // ------------------------------------------------------------------------------
@@ -220,12 +304,13 @@ int top(int argc, char **argv) {
 			}
 			close(sdCommand);
 		}
+		//TODO:::
 		// Create sockets
 		sdData = NatNet::createDataSocket(Globals::localAddress);
 		// Start up a FrameListener in a new thread.
 		FrameListener frameListener(sdData, natNetMajor, natNetMinor);
 		frameListener.start();
-		sleep(1);
+		usleep(2e5);
 	// --------------------------------------------------------------------------
 	//   PORT and THREAD for READ AND WRITE STARTUP
 	// --------------------------------------------------------------------------
@@ -253,14 +338,14 @@ int top(int argc, char **argv) {
 	signal(SIGINT, quit_handler);
 #else
 	std::vector<UDP_Client> udp_clients;
-	udp_clients.push_back(UDP_Client((std::string)APM_IP1,APM_PORT1,1));
-//	udp_clients.push_back(UDP_Client((std::string)APM_IP2,APM_PORT2,2));
-//	udp_clients.push_back(UDP_Client((std::string)APM_IP3,APM_PORT3,3));
-//	udp_clients.push_back(UDP_Client((std::string)APM_IP4,APM_PORT4,4));
+	udp_clients.push_back(UDP_Client((std::string)APM_IP1,APM_PORT1,1,platform_epoch));
+	udp_clients.push_back(UDP_Client((std::string)APM_IP2,APM_PORT2,2,platform_epoch));
+//	udp_clients.push_back(UDP_Client((std::string)APM_IP3,APM_PORT3,3,platform_epoch));
+//	udp_clients.push_back(UDP_Client((std::string)APM_IP4,APM_PORT4,4,platform_epoch));
 
 	std::vector<Autopilot_Interface> autopilot_interfaces;
 	for(uint8_t udp_ctr =0; udp_ctr<udp_clients.size();udp_ctr++){
-		autopilot_interfaces.push_back(Autopilot_Interface(udp_clients[udp_ctr]));
+		autopilot_interfaces.push_back(Autopilot_Interface(udp_clients[udp_ctr],platform_epoch));
 
 	}
 	autopilot_interface_quit = &autopilot_interfaces;
@@ -279,7 +364,13 @@ int top(int argc, char **argv) {
 		autopilot_interfaces[udp_ctr].start();
 	}
 
-	printFrames(frameListener,autopilot_interfaces);
+	//TODO:::
+
+	std::thread thisthread (printFrames,std::ref(frameListener),std::ref(autopilot_interfaces));
+	while(1){
+		usleep(1e6);
+		printf("running");
+	}
 //	timeStats(frameListener);
 
 
@@ -306,8 +397,8 @@ int top(int argc, char **argv) {
 	for(uint8_t udp_ctr =0; udp_ctr<udp_clients.size();udp_ctr++){
 		autopilot_interfaces[udp_ctr].stop();
 	}
-
-
+	thisthread.join();
+	//TODO:::
 	// Wait for threads to finish.
 	frameListener.stop();
 	frameListener.join();
@@ -486,36 +577,63 @@ void readOpts(int argc, char* argv[]) {
 
 
 	if (!vm.count("server-addr")){
-		sleep (0.2);
-		printf("\n Warning: No server address specified!\n");
+		usleep (3e5);
+		printf("Warning: No server address specified!\n");
 		Globals::haveServerIP = false;
-		sleep (0.2);
+		usleep (3e5);
+	}
+	else{
+		Globals::haveServerIP = true;
 	}
 
+
 	if (!vm.count("local-addr")){
-		sleep (0.2);
+		usleep (3e5);
 		Globals::haveLocalIP = false;
-		printf("Trying ethernet ...\n");
-//		std::string  ethernetIP = shellRun("/sbin/ifconfig eth0 | grep 'inet addr' | cut -d: -f2 | awk '{print $1}");
-//		sleep (0.2);
-//		std::cout<<ethernetIP<<std::endl;
+		printf("Warning: No local address specified!\n");
+		usleep (3e5);
+		printf("Trying Ethernet ...\n");
+		usleep (2e5);
+		std::string  ethernetIP = getIP("e");
+		if (strcmp(ethernetIP.c_str(),"127.0.0.1")==0){
+			printf("Trying WIFI ...\n");
+			std::string  wifiIP = getIP("w");
+			if (strcmp(wifiIP.c_str(),"127.0.0.1")==0){
+				Globals::obtainedIP =false;
+			}
+			Globals::localAddress = inet_addr(wifiIP.c_str());
+			std::cout<<wifiIP<<std::endl;
+		}
+		else{
+			std::cout<<ethernetIP<<std::endl;
+			Globals::localAddress = inet_addr(ethernetIP.c_str());
+		}
+		usleep (2e5);
+
 	}
+	else{
+		Globals::haveLocalIP = true;
+	}
+
 
 	if (argc < 5 || vm.count("help") || !vm.count("local-addr")
 			|| !vm.count("server-addr")) {
 		std::cout << desc << std::endl;
 	}
-	if (argc < 2){
+	if (!Globals::obtainedIP){
 		printf("exiting\n");
 		exit(1);
 	}
-	Globals::localAddress = inet_addr(
-			vm["local-addr"].as<std::string>().c_str());
+	if (Globals::haveServerIP){
+		Globals::localAddress = inet_addr(
+				vm["local-addr"].as<std::string>().c_str());
+	}
 	if (Globals::haveServerIP){
 		Globals::serverAddress = inet_addr(
 				vm["server-addr"].as<std::string>().c_str());
 	}
 }
+
 
 // ------------------------------------------------------------------------------
 //   Quit Signal Handler
@@ -557,11 +675,11 @@ void quat2Euler(float qx,float qy,float qz,float qw,  float& roll, float& pitch,
 	double r31 = 2*(qy*qz + qx*qw);
 	double r32 = qx*qx - qy*qy + qz*qz - qw*qw;
 	//-180 to 180 yaw
-	yaw   = (float)180/M_PI*std::atan2( r11, r12 );
+	yaw   = (float)std::atan2( r11, r12 );
 	//-90 to 90 pitch
-	pitch = (float)-180/M_PI*std::asin( r21 );
+	pitch = (float)-std::asin( r21 );
 	//-180 to 180 roll
-	roll   = (float)180 - 180/M_PI*std::atan2( r31, r32 );
+	roll   = (float)M_PI -std::atan2( r31, r32 );
 
 
 

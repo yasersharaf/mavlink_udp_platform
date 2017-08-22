@@ -7,12 +7,12 @@
 
 
 #include "UDP_Client.hpp"
-UDP_Client::UDP_Client(std::string str,int port_num, uint16_t id){
+UDP_Client::UDP_Client(std::string str,int port_num, uint16_t id,uint64_t platform_epoch_udp_){
 	strcpy(target_ip, str.c_str());
 	port = port_num;
 	udp_id = id;
 	std::cout<<"ip:"<<target_ip<<"\t port:"<<port<<std::endl;
-
+	platform_epoch_udp =platform_epoch_udp_;
 	status = PORT_CLOSED;
 }
 
@@ -143,7 +143,7 @@ ssize_t UDP_Client::read_message(mavlink_message_t &msg){
 
 //						printf("%ld\n",vicon_message.usec);
 //						printf("%lld\n",rcpt_time);
-						printf("delay %u = %lld\n",udp_id,rcpt_time-vicon_message.usec);
+						printf("\t\t\t\t\t\t\t\t\t\t\t delay %u = %lld\n",udp_id,rcpt_time-vicon_message.usec);
 
 						break;
 					}

@@ -249,8 +249,8 @@ class Autopilot_Interface
 public:
 
 	Autopilot_Interface();
-	Autopilot_Interface(Client *client_);
-	Autopilot_Interface(UDP_Client& udp_client_);
+	Autopilot_Interface(Client *client_,uint64_t);
+	Autopilot_Interface(UDP_Client& udp_client_,uint64_t);
 	~Autopilot_Interface();
 
 	char reading_status;
@@ -293,7 +293,8 @@ public:
 	void start_write_thread(void);
 
 	void handle_quit( int sig );
-
+	float mocap_yaw;
+	uint64_t platform_epoch_64;
 
 
 private:

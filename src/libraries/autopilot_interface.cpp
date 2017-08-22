@@ -57,12 +57,23 @@
 // ----------------------------------------------------------------------------------
 //   Time
 // ------------------- ---------------------------------------------------------------
-uint64_t
-get_time_usec()
+uint64_t get_time_usec()
 {
 	static struct timeval _time_stamp;
 	gettimeofday(&_time_stamp, NULL);
 	return _time_stamp.tv_sec*1000000 + _time_stamp.tv_usec;
+
+}
+
+//
+//uint64_t get_time_since_epoch()
+//{
+//	return   get_time_usec()-platform_epoch;
+//}
+//
+uint64_t get_time_since_epoch_embed_yaw(float mocap_yaw_,uint64_t platform_epoch_64_)
+{
+	return   ((uint64_t((mocap_yaw_+2*M_PI)*1e4)))*10;
 }
 
 
@@ -188,7 +199,7 @@ set_yaw_rate(float yaw_rate, mavlink_set_position_target_local_ned_t &sp)
 // Autopilot_Interface::
 // Autopilot_Interface(Serial_Port *serial_port_)
 
-Autopilot_Interface::Autopilot_Interface(Client* client_){
+Autopilot_Interface::Autopilot_Interface(Client* client_,uint64_t platform_epoch_64_){
 	// initialize attributes
 	write_count = 0;
 
@@ -208,9 +219,10 @@ Autopilot_Interface::Autopilot_Interface(Client* client_){
 	current_messages.compid = autopilot_id;
 
 	client = client_; // client port management object
+	platform_epoch_64 =  platform_epoch_64_;
 }
 
-Autopilot_Interface::Autopilot_Interface(UDP_Client& udp_client_){
+Autopilot_Interface::Autopilot_Interface(UDP_Client& udp_client_,uint64_t platform_epoch_64_){
 	// initialize attributes
 	write_count = 0;
 
@@ -232,6 +244,7 @@ Autopilot_Interface::Autopilot_Interface(UDP_Client& udp_client_){
 
 	udp_client = &udp_client_; // client port management object
 	std::cout<<udp_client->port<<std::endl;
+	platform_epoch_64 =  platform_epoch_64_;
 
 
 }
@@ -540,7 +553,7 @@ Autopilot_Interface::
 write_mocap_floats()
 {
 
-	current_mocap_value.usec = get_time_usec();
+	current_mocap_value.usec = get_time_since_epoch_embed_yaw(mocap_yaw,platform_epoch_64);
 
 	__mavlink_vicon_position_estimate_t pos_est = current_mocap_value;
 //	__mavlink_sim_state_t allposes = Mocap_Value;
@@ -553,12 +566,12 @@ write_mocap_floats()
 
     if (vicon_message_counter<=10){
  	   pos_est.usec = 2;
- 	   pos_est.x=1100.0;
- 	   pos_est.y=900.0;
+ 	   pos_est.x=1000.0;
+ 	   pos_est.y=1200.0;
  	   pos_est.z=0.0;
 
- 	   pos_est.roll=0.2;
- 	   pos_est.pitch=0.6;
+ 	   pos_est.roll=0.1;
+ 	   pos_est.pitch=0.1;
  	   pos_est.yaw=0.0;
     }
 
@@ -974,7 +987,7 @@ write_thread(void)
 	while ( !time_to_exit )
 	{
 //		1/write_frequncy
-		usleep(5e4);   // Stream at 50HZ
+		usleep(2.5e4);   // Stream at 20HZ
 
 //		write_gps_raw_int();
 

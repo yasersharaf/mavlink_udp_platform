@@ -13,8 +13,8 @@
 # define APM_IP1 "192.168.0.100"
 # define APM_PORT1 5678
 
-# define APM_IP2 "127.0.0.1"
-# define APM_PORT2 7890
+# define APM_IP2 "192.168.0.102"
+# define APM_PORT2 1234
 
 # define APM_IP3 "127.0.0.1"
 # define APM_PORT3 5678

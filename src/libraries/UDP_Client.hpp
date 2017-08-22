@@ -39,7 +39,7 @@ using namespace std;
 class UDP_Client{
 public:
 	UDP_Client();
-	UDP_Client(std::string,int,uint16_t);
+	UDP_Client(std::string,int,uint16_t,uint64_t);
 	~UDP_Client();
 	int get_sock();
 	uint64_t microsSinceEpoch();
@@ -59,6 +59,7 @@ public:
 	int sock;
 	static const unsigned int buffer_length = 300;
 	uint16_t udp_id;
+	uint64_t platform_epoch_udp;
 
 };
 
