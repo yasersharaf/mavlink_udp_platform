@@ -214,7 +214,7 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 			api[api_ctr].previous_mocap_value = api[api_ctr].current_mocap_value;
 			api[api_ctr].previous_mocap_value.usec = get_time_usec();
 
-			logFile<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\n";
+			logFile<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<yaw<<"\t"<<rBodies[api_ctr].location().x<<"\t"<<rBodies[api_ctr].location().y<<"\t"<<rBodies[api_ctr].location().z<<"\n";
 //			std::cout<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\n";
 //			printf("%f\t%f\t%f\n",api[api_ctr].current_mocap_value.x,api[api_ctr].current_mocap_value.y,api[api_ctr].current_mocap_value.z);
 
@@ -238,9 +238,9 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 				gp.send1d(data2);
 				gpxy.send1d(dataxy);
 			}
-			readFromMocapCounter++;
-			usleep(20000);
 		}
+		usleep(20000);
+		readFromMocapCounter++;
 
 	}
 	printf("\nEnded autopilot belief updater!\n");
@@ -360,6 +360,8 @@ int top(int argc, char **argv) {
 	 */
 
 //	client.open_connection();
+	autopilot_interfaces[0].set_position_vicon_message(0.0, 0.0, 1.7);
+	autopilot_interfaces[1].set_position_vicon_message(-3.0, 0.0, 1.7);
 	for(uint8_t udp_ctr =0; udp_ctr<udp_clients.size();udp_ctr++){
 		autopilot_interfaces[udp_ctr].start();
 	}

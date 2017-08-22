@@ -10,10 +10,10 @@
 
 # define M_PI  3.14159265358979323846
 
-# define APM_IP1 "192.168.0.100"
+# define APM_IP1 "192.168.0.201"
 # define APM_PORT1 5678
 
-# define APM_IP2 "192.168.0.102"
+# define APM_IP2 "192.168.0.202"
 # define APM_PORT2 1234
 
 # define APM_IP3 "127.0.0.1"

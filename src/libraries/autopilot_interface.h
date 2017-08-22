@@ -274,6 +274,7 @@ public:
 	__mavlink_vicon_position_estimate_t current_mocap_value;
 	__mavlink_vicon_position_estimate_t previous_mocap_value;
 	__mavlink_vicon_position_estimate_t received_mocap_value;
+	__mavlink_vicon_position_estimate_t target_mocap;
 	__mavlink_sim_state_t Mocap_Value;
 	int vicon_message_counter = 0;
 
@@ -293,6 +294,8 @@ public:
 	void start_write_thread(void);
 
 	void handle_quit( int sig );
+	void set_position_vicon_message(float x, float y, float z);
+	void land_command();
 	float mocap_yaw;
 	uint64_t platform_epoch_64;
 

@@ -1,10 +1,10 @@
 clear
 close all
-output = load('log.txt');
-upto = 15483;
-output=output(50:end,:);
+output = load('log_two_quads.txt');
+% output=output(50:end,:);
 zeroInd = find(output(:,3)<0.1);
 output(zeroInd,:)=[];
+upto = size(output,1);
 output(:,1)=(output(:,1)-output(1,1))/1e6;
 outputF = output;
 for i =2:length(outputF)

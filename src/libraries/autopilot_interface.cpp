@@ -105,6 +105,8 @@ set_position(float x, float y, float z, mavlink_set_position_target_local_ned_t 
 
 }
 
+
+
 /*
  * Set target local ned velocity
  *
@@ -247,6 +249,15 @@ Autopilot_Interface::Autopilot_Interface(UDP_Client& udp_client_,uint64_t platfo
 	platform_epoch_64 =  platform_epoch_64_;
 
 
+	target_mocap.x=0;
+	target_mocap.y=0;
+	target_mocap.z=0;
+	target_mocap.roll=0;
+	target_mocap.pitch=0;
+	target_mocap.yaw=0;
+
+
+
 }
 
 Autopilot_Interface::
@@ -264,6 +275,35 @@ update_setpoint(mavlink_set_position_target_local_ned_t setpoint)
 	current_setpoint = setpoint;
 }
 
+void
+Autopilot_Interface::set_position_vicon_message(float x, float y, float z)
+{
+	target_mocap.usec = 3;
+	target_mocap.x   = x;
+	target_mocap.y   = y;
+	target_mocap.z   = z;
+
+	printf("POSITION SETPOINT XYZ = [ %.4f , %.4f , %.4f ] \n", target_mocap.x, target_mocap.x, target_mocap.x);
+
+}
+
+void
+Autopilot_Interface::land_command()
+{
+	__mavlink_vicon_position_estimate_t pos_est = current_mocap_value;
+	target_mocap.z   = 0;
+	pos_est = target_mocap;
+	printf("POSITION SETPOINT XYZ = [ %.4f , %.4f , %.4f ] \n", target_mocap.x, target_mocap.x, target_mocap.x);
+    mavlink_message_t message;
+    mavlink_msg_vicon_position_estimate_encode(system_id, companion_id, &message, &pos_est);
+    int len = 0;
+    for (int i = 0; i<3;i++){
+        len = write_message(message);
+        usleep(2e5);
+    }
+    printf("Abort mission; target set with result: %d\nAbort mission; target set with result: %d\nAbort mission; target set with result: %d\n",len,len,len);
+
+}
 
 // ------------------------------------------------------------------------------
 //   Read Messages
@@ -567,7 +607,7 @@ write_mocap_floats()
     if (vicon_message_counter<=10){
  	   pos_est.usec = 2;
  	   pos_est.x=1000.0;
- 	   pos_est.y=1200.0;
+ 	   pos_est.y=500.0;
  	   pos_est.z=0.0;
 
  	   pos_est.roll=0.1;
@@ -576,14 +616,7 @@ write_mocap_floats()
     }
 
     if (vicon_message_counter>=11 && vicon_message_counter<=20){
- 	   pos_est.usec = 3;
- 	   pos_est.x=0.295;
- 	   pos_est.y=0.325;
- 	   pos_est.z=0.348;
-
- 	   pos_est.roll=0;
- 	   pos_est.pitch=0;
- 	   pos_est.yaw=0;
+    	pos_est = target_mocap;
     }
            printf("---%ld \n\n",pos_est.usec);
        printf("%f \t  %f \t  %f \t %f \t  %f \t  %f \n\n",pos_est.x,pos_est.y,pos_est.z,pos_est.pitch,pos_est.roll, pos_est.yaw);
@@ -932,6 +965,8 @@ handle_quit( int sig )
 	disable_offboard_control();
 
 	try {
+		land_command();
+		usleep(4e5);
 		stop();
 
 	}
