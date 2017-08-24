@@ -145,6 +145,7 @@ std::string getIP(char* netType)
 
 // This thread loop just prints frames as they arrive.
 void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& api ) {
+
 	bool valid;
 	MocapFrame frame;
 	Globals::run = true;
@@ -186,11 +187,12 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 		float dt =0;
 		uint64_t u_dt = 0;
 		for(uint16_t api_ctr =0; api_ctr<api.size();api_ctr++){
+			printf("\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t %f\n",api[api_ctr].target_mocap.z);
 //TODO:::
 			quat2Euler(rBodies[api_ctr].orientation().qx,rBodies[api_ctr].orientation().qy,rBodies[api_ctr].orientation().qz,rBodies[api_ctr].orientation().qw, roll, pitch, yaw);
 			api[api_ctr].mocap_yaw = yaw;
 			api[api_ctr].current_mocap_value.usec = ((uint64_t((yaw+2*M_PI)*1e4)))*10;
-			std::cout<<"yaw: "<<api[api_ctr].current_mocap_value.usec<<" yaw: "<<yaw<<std::endl;
+//			std::cout<<"yaw: "<<api[api_ctr].current_mocap_value.usec<<" yaw: "<<yaw<<std::endl;
 //			api[api_ctr].current_mocap_value.x = cos(M_PI/180*yaw)*rBodies[api_ctr].location().z +  sin(M_PI/180*yaw)*rBodies[api_ctr].location().x;
 //			api[api_ctr].current_mocap_value.y = -sin(M_PI/180*yaw)*rBodies[api_ctr].location().z +  cos(M_PI/180*yaw)*rBodies[api_ctr].location().x;
 //			api[api_ctr].current_mocap_value.z = rBodies[api_ctr].location().y;
@@ -214,7 +216,7 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 			api[api_ctr].previous_mocap_value = api[api_ctr].current_mocap_value;
 			api[api_ctr].previous_mocap_value.usec = get_time_usec();
 
-			logFile<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<yaw<<"\t"<<rBodies[api_ctr].location().x<<"\t"<<rBodies[api_ctr].location().y<<"\t"<<rBodies[api_ctr].location().z<<"\n";
+			logFile<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<yaw<<"\t"<<rBodies[api_ctr].location().z<<"\t"<<rBodies[api_ctr].location().x<<"\t"<<rBodies[api_ctr].location().y<<"\n";
 //			std::cout<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\n";
 //			printf("%f\t%f\t%f\n",api[api_ctr].current_mocap_value.x,api[api_ctr].current_mocap_value.y,api[api_ctr].current_mocap_value.z);
 
@@ -340,7 +342,7 @@ int top(int argc, char **argv) {
 	std::vector<UDP_Client> udp_clients;
 	udp_clients.push_back(UDP_Client((std::string)APM_IP1,APM_PORT1,1,platform_epoch));
 	udp_clients.push_back(UDP_Client((std::string)APM_IP2,APM_PORT2,2,platform_epoch));
-//	udp_clients.push_back(UDP_Client((std::string)APM_IP3,APM_PORT3,3,platform_epoch));
+	udp_clients.push_back(UDP_Client((std::string)APM_IP3,APM_PORT3,3,platform_epoch));
 //	udp_clients.push_back(UDP_Client((std::string)APM_IP4,APM_PORT4,4,platform_epoch));
 
 	std::vector<Autopilot_Interface> autopilot_interfaces;
@@ -360,8 +362,9 @@ int top(int argc, char **argv) {
 	 */
 
 //	client.open_connection();
-	autopilot_interfaces[0].set_position_vicon_message(0.0, 0.0, 1.7);
-	autopilot_interfaces[1].set_position_vicon_message(-3.0, 0.0, 1.7);
+	autopilot_interfaces[0].set_position_vicon_message(0.0 , 0.0, 1.7);
+	autopilot_interfaces[1].set_position_vicon_message(0.75,  0.0, 1.7);
+	autopilot_interfaces[2].set_position_vicon_message(0.75 ,-2.5, 1.7);
 	for(uint8_t udp_ctr =0; udp_ctr<udp_clients.size();udp_ctr++){
 		autopilot_interfaces[udp_ctr].start();
 	}
@@ -369,6 +372,13 @@ int top(int argc, char **argv) {
 	//TODO:::
 
 	std::thread thisthread (printFrames,std::ref(frameListener),std::ref(autopilot_interfaces));
+
+	usleep(5e6);
+
+	for(uint8_t udp_ctr =0; udp_ctr<udp_clients.size();udp_ctr++){
+		autopilot_interfaces[udp_ctr].change_mode_then_arm_disarm(true,true);
+	}
+
 	while(1){
 		usleep(1e6);
 		printf("running");
@@ -397,6 +407,7 @@ int top(int argc, char **argv) {
 	// buffer each time through, and exits when ctrl-c is pressed.
 
 	for(uint8_t udp_ctr =0; udp_ctr<udp_clients.size();udp_ctr++){
+		autopilot_interfaces[udp_ctr].change_mode_then_arm_disarm(false,false);
 		autopilot_interfaces[udp_ctr].stop();
 	}
 	thisthread.join();

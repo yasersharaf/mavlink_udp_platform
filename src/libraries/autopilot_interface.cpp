@@ -288,9 +288,29 @@ Autopilot_Interface::set_position_vicon_message(float x, float y, float z)
 }
 
 void
+Autopilot_Interface::change_mode_then_arm_disarm(bool arm_disarm,bool is_mc)
+{
+	__mavlink_vicon_position_estimate_t mode_arm_disarm_packet;
+	mode_arm_disarm_packet.usec =4;
+	mode_arm_disarm_packet.x = arm_disarm==true ? 1.0:0.0;
+	mode_arm_disarm_packet.y = is_mc==true ? 1.0:0.0;
+
+	printf("POSITION SETPOINT XYZ = [ %.4f , %.4f , %.4f ] \n", target_mocap.x, target_mocap.x, target_mocap.x);
+    mavlink_message_t message;
+    mavlink_msg_vicon_position_estimate_encode(system_id, companion_id, &message, &mode_arm_disarm_packet);
+    int len = 0;
+    for (int i = 0; i<3;i++){
+        len = write_message(message);
+        usleep(6e4);
+    }
+    printf("High priority set with result: %d\nHigh priority set with result: %d\nHigh priority set with result: %d\n",len,len,len);
+
+}
+
+void
 Autopilot_Interface::land_command()
 {
-	__mavlink_vicon_position_estimate_t pos_est = current_mocap_value;
+	__mavlink_vicon_position_estimate_t pos_est = target_mocap;
 	target_mocap.z   = 0;
 	pos_est = target_mocap;
 	printf("POSITION SETPOINT XYZ = [ %.4f , %.4f , %.4f ] \n", target_mocap.x, target_mocap.x, target_mocap.x);
@@ -299,7 +319,7 @@ Autopilot_Interface::land_command()
     int len = 0;
     for (int i = 0; i<3;i++){
         len = write_message(message);
-        usleep(2e5);
+        usleep(6e4);
     }
     printf("Abort mission; target set with result: %d\nAbort mission; target set with result: %d\nAbort mission; target set with result: %d\n",len,len,len);
 
@@ -618,7 +638,7 @@ write_mocap_floats()
     if (vicon_message_counter>=11 && vicon_message_counter<=20){
     	pos_est = target_mocap;
     }
-           printf("---%ld \n\n",pos_est.usec);
+//           printf("---%ld \n\n",pos_est.usec);
        printf("%f \t  %f \t  %f \t %f \t  %f \t  %f \n\n",pos_est.x,pos_est.y,pos_est.z,pos_est.pitch,pos_est.roll, pos_est.yaw);
 
        mavlink_message_t message;
@@ -965,8 +985,8 @@ handle_quit( int sig )
 	disable_offboard_control();
 
 	try {
+		change_mode_then_arm_disarm(false,false);
 		land_command();
-		usleep(4e5);
 		stop();
 
 	}

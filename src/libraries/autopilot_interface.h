@@ -295,6 +295,7 @@ public:
 
 	void handle_quit( int sig );
 	void set_position_vicon_message(float x, float y, float z);
+	void change_mode_then_arm_disarm(bool arm_disarm,bool is_mc);
 	void land_command();
 	float mocap_yaw;
 	uint64_t platform_epoch_64;

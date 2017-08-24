@@ -49,7 +49,7 @@ const int port = 6789;
 // For STATION mode:
 const char *ssid = "ABCD";  // Your ROUTER SSID
 const char *pw = "dcds2011"; // and WiFi PASSWORD
-const int port = 5678;
+const int port = 3456;
 // You must connect the phone to the same router,
 // Then somehow find the IP that the ESP got from router, then:
 // menu -> connect -> Internet(TCP) -> [ESP_IP]:9876
