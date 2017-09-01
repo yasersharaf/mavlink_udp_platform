@@ -590,10 +590,10 @@ void readOpts(int argc, char* argv[]) {
 
 
 	if (!vm.count("server-addr")){
-		usleep (3e5);
+		usleep (2e5);
 		printf("Warning: No server address specified!\n");
 		Globals::haveServerIP = false;
-		usleep (3e5);
+		usleep (2e5);
 	}
 	else{
 		Globals::haveServerIP = true;
@@ -601,10 +601,10 @@ void readOpts(int argc, char* argv[]) {
 
 
 	if (!vm.count("local-addr")){
-		usleep (3e5);
+		usleep (2e5);
 		Globals::haveLocalIP = false;
 		printf("Warning: No local address specified!\n");
-		usleep (3e5);
+		usleep (2e5);
 		printf("Trying Ethernet ...\n");
 		usleep (2e5);
 		std::string  ethernetIP = getIP("e");
