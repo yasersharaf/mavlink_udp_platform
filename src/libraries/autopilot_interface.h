@@ -275,6 +275,7 @@ public:
 	__mavlink_vicon_position_estimate_t previous_mocap_value;
 	__mavlink_vicon_position_estimate_t received_mocap_value;
 	__mavlink_vicon_position_estimate_t target_mocap;
+	__mavlink_vicon_position_estimate_t attitude_gain;
 	__mavlink_sim_state_t Mocap_Value;
 	int vicon_message_counter = 0;
 

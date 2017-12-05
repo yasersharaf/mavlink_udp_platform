@@ -3,8 +3,8 @@ close all
 
 for i = 2
     output = load('log.txt');
-    output = output((1+i):3:end,:);
-    output = output(1900:end,:);
+    output = output((1+i):1:end,:);
+    output = output(400:end,:);
     output(:,1)=[];
     output(:,1)=output(:,2);
     % output=output(50:end,:);

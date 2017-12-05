@@ -143,7 +143,7 @@ ssize_t UDP_Client::read_message(mavlink_message_t &msg){
 
 //						printf("%ld\n",vicon_message.usec);
 //						printf("%lld\n",rcpt_time);
-						printf("\t\t\t\t\t\t\t\t\t\t\t delay %u = %lld\n",udp_id,rcpt_time-vicon_message.usec);
+						printf("\t\t\t\t\t\t\t\t\t\t\t\t\t\t delay %u = %lld\n",udp_id,rcpt_time-vicon_message.usec);
 
 						break;
 					}

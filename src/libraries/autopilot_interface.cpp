@@ -73,7 +73,10 @@ uint64_t get_time_usec()
 //
 uint64_t get_time_since_epoch_embed_yaw(float mocap_yaw_,uint64_t platform_epoch_64_)
 {
+//	printf("mocapYaw: %lld\n",((uint64_t((mocap_yaw_+2*M_PI)*1e4)))*10);
 	return   ((uint64_t((mocap_yaw_+2*M_PI)*1e4)))*10;
+//	return   get_time_usec();
+	//delay test
 }
 
 
@@ -626,20 +629,29 @@ write_mocap_floats()
 
     if (vicon_message_counter<=10){
  	   pos_est.usec = 2;
- 	   pos_est.x=1000.0;
- 	   pos_est.y=500.0;
+ 	   pos_est.x=1500.0;
+ 	   pos_est.y=1100.0;
  	   pos_est.z=0.0;
 
- 	   pos_est.roll=0.1;
- 	   pos_est.pitch=0.1;
+ 	   pos_est.roll=0.2;
+ 	   pos_est.pitch=0.2;
  	   pos_est.yaw=0.0;
     }
 
     if (vicon_message_counter>=11 && vicon_message_counter<=20){
     	pos_est = target_mocap;
     }
+    if (vicon_message_counter>=21 && vicon_message_counter<=30){
+    	attitude_gain.usec = 5;
+    	attitude_gain.x = 0.06;
+    	attitude_gain.y = 0.01;
+    	attitude_gain.z = 0.2;
+    	attitude_gain.roll = 0.05;
+    	pos_est = attitude_gain;
+    }
+
 //           printf("---%ld \n\n",pos_est.usec);
-       printf("%f \t  %f \t  %f \t %f \t  %f \t  %f \n\n",pos_est.x,pos_est.y,pos_est.z,pos_est.pitch,pos_est.roll, pos_est.yaw);
+//       printf("%f \t  %f \t  %f \t %f \t  %f \t  %f \n\n",pos_est.x,pos_est.y,pos_est.z,pos_est.pitch,pos_est.roll, pos_est.yaw);
 
        mavlink_message_t message;
 

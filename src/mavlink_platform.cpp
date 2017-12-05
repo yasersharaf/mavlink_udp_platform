@@ -63,11 +63,6 @@ uint64_t platform_epoch = 0;
 
 
 
-
-
-
-
-
 class Globals {
 public:
 
@@ -157,8 +152,8 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 
     int readFromMocapCounter = 0; //for gnu
 //	  gp.close();
-
-	logFile.open("log.txt");
+    std::string fileName  = "log"+std::to_string(get_time_usec())+".txt";
+	logFile.open(fileName);
 
 	while (Globals::run) {
 		//TODO:::
@@ -169,6 +164,7 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 //			break;
 
 		std::vector<RigidBody> const& rBodies = frame.rigidBodies();
+//		rBodies.
 //		uint16_t numerOfBodies = rBodies.size();
 //TODO:::
 		if (rBodies.size()<api.size()){
@@ -187,11 +183,11 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 		float dt =0;
 		uint64_t u_dt = 0;
 		for(uint16_t api_ctr =0; api_ctr<api.size();api_ctr++){
-			printf("\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t %f\n",api[api_ctr].target_mocap.z);
+//			printf("\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t %f\n",api[api_ctr].target_mocap.z);
 //TODO:::
 			quat2Euler(rBodies[api_ctr].orientation().qx,rBodies[api_ctr].orientation().qy,rBodies[api_ctr].orientation().qz,rBodies[api_ctr].orientation().qw, roll, pitch, yaw);
 			api[api_ctr].mocap_yaw = yaw;
-			api[api_ctr].current_mocap_value.usec = ((uint64_t((yaw+2*M_PI)*1e4)))*10;
+
 //			std::cout<<"yaw: "<<api[api_ctr].current_mocap_value.usec<<" yaw: "<<yaw<<std::endl;
 //			api[api_ctr].current_mocap_value.x = cos(M_PI/180*yaw)*rBodies[api_ctr].location().z +  sin(M_PI/180*yaw)*rBodies[api_ctr].location().x;
 //			api[api_ctr].current_mocap_value.y = -sin(M_PI/180*yaw)*rBodies[api_ctr].location().z +  cos(M_PI/180*yaw)*rBodies[api_ctr].location().x;
@@ -207,41 +203,42 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 			u_dt = get_time_usec() - api[api_ctr].previous_mocap_value.usec;
 			dt = (float)(u_dt/1e6);
 			printf("dt = %f \n",dt);
-			api[api_ctr].current_mocap_value.pitch = (api[api_ctr].current_mocap_value.x-api[api_ctr].previous_mocap_value.x)/dt;
-			api[api_ctr].current_mocap_value.roll = (api[api_ctr].current_mocap_value.y-api[api_ctr].previous_mocap_value.y)/dt;
-			api[api_ctr].current_mocap_value.yaw =  (api[api_ctr].current_mocap_value.z-api[api_ctr].previous_mocap_value.z)/dt;
+			// filter
+			api[api_ctr].current_mocap_value.pitch = 0.7*api[api_ctr].current_mocap_value.pitch+ 0.3*(api[api_ctr].current_mocap_value.x-api[api_ctr].previous_mocap_value.x)/dt;
+			api[api_ctr].current_mocap_value.roll = 0.7*api[api_ctr].current_mocap_value.roll  + 0.3*(api[api_ctr].current_mocap_value.y-api[api_ctr].previous_mocap_value.y)/dt;
+			api[api_ctr].current_mocap_value.yaw =  0.7*api[api_ctr].current_mocap_value.yaw   + 0.3*(api[api_ctr].current_mocap_value.z-api[api_ctr].previous_mocap_value.z)/dt;
 //			api[api_ctr].current_mocap_value.pitch = pitch;
 //			api[api_ctr].current_mocap_value.roll = roll;
 //			api[api_ctr].current_mocap_value.yaw = yaw;
 			api[api_ctr].previous_mocap_value = api[api_ctr].current_mocap_value;
 			api[api_ctr].previous_mocap_value.usec = get_time_usec();
-
-			logFile<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<yaw<<"\t"<<rBodies[api_ctr].location().z<<"\t"<<rBodies[api_ctr].location().x<<"\t"<<rBodies[api_ctr].location().y<<"\n";
-//			std::cout<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\n";
-//			printf("%f\t%f\t%f\n",api[api_ctr].current_mocap_value.x,api[api_ctr].current_mocap_value.y,api[api_ctr].current_mocap_value.z);
-
+//			logFile<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<yaw<<"\t"<<rBodies[api_ctr].location().z<<"\t"<<rBodies[api_ctr].location().x<<"\t"<<rBodies[api_ctr].location().y<<"\n";
+//			std::cout<<"apiVal: "<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\n";
+			printf("mocap: %f\t%f\t%f\t%f\t%f\t%f\n",api[api_ctr].current_mocap_value.x,api[api_ctr].current_mocap_value.y,api[api_ctr].current_mocap_value.z,roll,pitch,yaw);
+			//delay test
+			logFile<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<roll<<"\t"<<pitch<<"\n";
+			std::cout<<"apival:"<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<"\n";
 			//plottingdata
 			if (readFromMocapCounter%11==0){
 
-				data.emplace_back(readFromMocapCounter,api[api_ctr].current_mocap_value.x);
-				data2.emplace_back(readFromMocapCounter,api[api_ctr].current_mocap_value.y);
-				dataxy.emplace_back(rBodies[api_ctr].location().z,rBodies[api_ctr].location().x);
-
-
-				if(data.size()>500){
-				data.erase(data.begin());
-				data2.erase(data2.begin());
-				dataxy.erase(dataxy.begin());
-				}
-				gp << "set grid;set autoscale fix;plot'-' tit 'X' with line,'-' tit 'Y' with line\n";
-				gpxy << "set grid;set autoscale fix;plot'-' tit 'XY' \n";
-//				std::cout<<data.size()<<"\t"<<data.size()<<"\t"<<data.size()<<"\t"<<data.size()<<"\t"<<data.size()<<std::endl;
-				gp.send1d(data);
-				gp.send1d(data2);
-				gpxy.send1d(dataxy);
+//				data.emplace_back(readFromMocapCounter,api[api_ctr].current_mocap_value.x);
+//				data2.emplace_back(readFromMocapCounter,api[api_ctr].current_mocap_value.y);
+//				dataxy.emplace_back(rBodies[api_ctr].location().z,rBodies[api_ctr].location().x);
+//
+//
+//				if(data.size()>500){
+//				data.erase(data.begin());
+//				data2.erase(data2.begin());
+//				dataxy.erase(dataxy.begin());
+//				}
+//				gp << "set grid;set autoscale fix;plot'-' tit 'X' with line,'-' tit 'Y' with line\n";
+//				gpxy << "set grid;set autoscale fix;plot'-' tit 'XY' \n";
+//				gp.send1d(data);
+//				gp.send1d(data2);
+//				gpxy.send1d(dataxy);
 			}
 		}
-		usleep(20000);
+		usleep(8340);
 		readFromMocapCounter++;
 
 	}
@@ -341,8 +338,8 @@ int top(int argc, char **argv) {
 #else
 	std::vector<UDP_Client> udp_clients;
 	udp_clients.push_back(UDP_Client((std::string)APM_IP1,APM_PORT1,1,platform_epoch));
-	udp_clients.push_back(UDP_Client((std::string)APM_IP2,APM_PORT2,2,platform_epoch));
-	udp_clients.push_back(UDP_Client((std::string)APM_IP3,APM_PORT3,3,platform_epoch));
+//	udp_clients.push_back(UDP_Client((std::string)APM_IP2,APM_PORT2,2,platform_epoch));
+//	udp_clients.push_back(UDP_Client((std::string)APM_IP3,APM_PORT3,3,platform_epoch));
 //	udp_clients.push_back(UDP_Client((std::string)APM_IP4,APM_PORT4,4,platform_epoch));
 
 	std::vector<Autopilot_Interface> autopilot_interfaces;
@@ -682,6 +679,7 @@ void quit_handler(int sig) {
 }
 void quat2Euler(float qx,float qy,float qz,float qw,  float& roll, float& pitch, float& yaw){
 
+	printf("q: %f\t%f\t%f\t%f\t",qx,qy,qz,qw);
 	double r11 = 2*(qy*qw + qx*qz);
 	double r12 = qx*qx - qy*qy - qz*qz + qw*qw;
 	double r21 =-2*(qz*qw - qx*qy);
@@ -689,10 +687,15 @@ void quat2Euler(float qx,float qy,float qz,float qw,  float& roll, float& pitch,
 	double r32 = qx*qx - qy*qy + qz*qz - qw*qw;
 	//-180 to 180 yaw
 	yaw   = (float)std::atan2( r11, r12 );
+	printf("yaw: %f\n\n",yaw);
 	//-90 to 90 pitch
 	pitch = (float)-std::asin( r21 );
 	//-180 to 180 roll
 	roll   = (float)M_PI -std::atan2( r31, r32 );
+	roll = fmod(roll,2*M_PI);
+	if (roll > M_PI){
+		roll = roll - 2*M_PI;
+	}
 
 
 
