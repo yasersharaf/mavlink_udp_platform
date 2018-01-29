@@ -473,45 +473,47 @@ public:
       memcpy(&_ori.qz,data,4); data += 4;
       memcpy(&_ori.qw,data,4); data += 4;
       
-      // Associated markers
-      int nMarkers = 0;
-      memcpy(&nMarkers,data,4); data += 4;
-      for( i = 0; i < nMarkers; ++i )
-      {
-         memcpy(&x,data,4); data += 4;
-         memcpy(&y,data,4); data += 4;
-         memcpy(&z,data,4); data += 4;
-         _markers.push_back(Point3f(x,y,z));
+      if( nnMajor <= 2 ){
+		  // Associated markers
+		  int nMarkers = 0;
+		  memcpy(&nMarkers,data,4); data += 4;
+		  for( i = 0; i < nMarkers; ++i )
+		  {
+			 memcpy(&x,data,4); data += 4;
+			 memcpy(&y,data,4); data += 4;
+			 memcpy(&z,data,4); data += 4;
+			 _markers.push_back(Point3f(x,y,z));
+		  }
+
+		  if( nnMajor >= 2 )
+		  {
+			 // Marker IDs
+			 uint32_t id = 0;
+			 for( i = 0; i < nMarkers; ++i )
+			 {
+				memcpy(&id,data,4); data += 4;
+				_mId.push_back(id);
+			 }
+
+			 // Marker sizes
+			 float size;
+			 for( i = 0; i < nMarkers; ++i )
+			 {
+				memcpy(&size,data,4); data += 4;
+				_mSize.push_back(size);
+			 }
+
+			 if( ((nnMajor==2) && (nnMinor >= 6)) || (nnMajor > 2) || (nnMajor == 0) )
+			 {
+				uint16_t tmp;
+				memcpy(&tmp, data, 2); data += 2;
+				_trackingValid = tmp & 0x01;
+			 }
+			 // Mean marker error
+			 memcpy(&_mErr,data,4); data += 4;
+		  }
       }
 
-      if( nnMajor >= 2 )
-      {
-         // Marker IDs
-         uint32_t id = 0;
-         for( i = 0; i < nMarkers; ++i )
-         {
-            memcpy(&id,data,4); data += 4;
-            _mId.push_back(id);
-         }
-
-         // Marker sizes
-         float size;
-         for( i = 0; i < nMarkers; ++i )
-         {
-            memcpy(&size,data,4); data += 4;
-            _mSize.push_back(size);
-         }
-
-         if( ((nnMajor==2) && (nnMinor >= 6)) || (nnMajor > 2) || (nnMajor == 0) )
-         {
-            uint16_t tmp;
-            memcpy(&tmp, data, 2); data += 2;
-            _trackingValid = tmp & 0x01;
-         }
-         // Mean marker error
-         memcpy(&_mErr,data,4); data += 4;
-      }
-      
       return data;
    }
    
@@ -921,54 +923,55 @@ public:
          memcpy(&z,data,4); data += 4;
          _uidMarker.push_back(Point3f(x,y,z));
       }
-      
+
       // Get rigid bodies
       _numRigidBodies = 0;
       memcpy(&_numRigidBodies,data,4); data += 4;
+//      printf("num rigid bodies %d\n",_numRigidBodies);
       for( i = 0; i < _numRigidBodies; ++i )
       {
          RigidBody b;
          data = b.unpack(data, _nnMajor, _nnMinor);
          _rBodies.push_back(b);
       }
-      
-      // Get skeletons (NatNet 2.1 and later)
-      if( _nnMajor > 2 || (_nnMajor==2 && _nnMinor >= 1) )
-      {
-         int numSkel = 0;
-         memcpy(&numSkel,data,4); data += 4;
-         for( i = 0; i < numSkel; ++i )
-         {
-            Skeleton s;
-            data = s.unpack( data, _nnMajor, _nnMinor );
-            _skel.push_back(s);
-         }
-      }
-      
-      // Get labeled markers (NatNet 2.3 and later)
-      if( _nnMajor > 2 || (_nnMajor==2 && _nnMinor >= 3) )
-      {
-         int numLabMark = 0;
-         memcpy(&numLabMark,data,4); data += 4;
-         for( i = 0; i < numLabMark; ++i )
-         {
-            LabeledMarker lm;
-            data = lm.unpack(data);
-            _labeledMarkers.push_back(lm);
-         }
-      }
-      
-      // Get latency/timecode
-      memcpy(&_latency,data,4); data += 4;
-      
-      // Get timecode
-      memcpy(&_timecode,data,4); data += 4;
-      memcpy(&_subTimecode,data,4); data += 4;
-      
-      // Get "end of data" tag
-      int eod = 0;
-      memcpy(&eod,data,4); data += 4;
-      
+//
+//      // Get skeletons (NatNet 2.1 and later)
+//      if( _nnMajor > 2 || (_nnMajor==2 && _nnMinor >= 1) )
+//      {
+//         int numSkel = 0;
+//         memcpy(&numSkel,data,4); data += 4;
+//         for( i = 0; i < numSkel; ++i )
+//         {
+//            Skeleton s;
+//            data = s.unpack( data, _nnMajor, _nnMinor );
+//            _skel.push_back(s);
+//         }
+//      }
+//
+//      // Get labeled markers (NatNet 2.3 and later)
+//      if( _nnMajor > 2 || (_nnMajor==2 && _nnMinor >= 3) )
+//      {
+//         int numLabMark = 0;
+//         memcpy(&numLabMark,data,4); data += 4;
+//         for( i = 0; i < numLabMark; ++i )
+//         {
+//            LabeledMarker lm;
+//            data = lm.unpack(data);
+//            _labeledMarkers.push_back(lm);
+//         }
+//      }
+//
+//      // Get latency/timecode
+//      memcpy(&_latency,data,4); data += 4;
+//
+//      // Get timecode
+//      memcpy(&_timecode,data,4); data += 4;
+//      memcpy(&_subTimecode,data,4); data += 4;
+//
+//      // Get "end of data" tag
+//      int eod = 0;
+//      memcpy(&eod,data,4); data += 4;
+//
       return data;
    }
    

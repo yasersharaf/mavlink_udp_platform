@@ -205,12 +205,13 @@ private:
          
          clock_gettime( CLOCK_REALTIME, &ts );
          dataBytes = read( sd, nnp.rawPtr(), nnp.maxLength() );
-         
+
          if( dataBytes > 0 && nnp.iMessage() == NatNetPacket::NAT_FRAMEOFDATA )
          {
             MocapFrame mFrame(_nnMajor,_nnMinor);
             mFrame.unpack(nnp.rawPayloadPtr());
             _framesMutex.lock();
+//            	printf("in mutex lock\n");
                _frames.push_back(std::make_pair(mFrame,ts));
             _framesMutex.unlock();
          }

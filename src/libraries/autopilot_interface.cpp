@@ -71,10 +71,14 @@ uint64_t get_time_usec()
 //	return   get_time_usec()-platform_epoch;
 //}
 //
-uint64_t get_time_since_epoch_embed_yaw(float mocap_yaw_,uint64_t platform_epoch_64_)
+uint64_t get_time_since_epoch_embed_yaw(float mocap_yaw_,uint64_t platform_epoch_64_, float quad_roll_offset_, float quad_pitch_offset_)
 {
+//	quad_roll_offset_ = 0.054321;
+//	quad_pitch_offset_ = 0.045678;
+	cout<< "\n packing: "<<mocap_yaw_<<"\t"<<quad_roll_offset_<<"\t"<<quad_pitch_offset_<<"\n";
 //	printf("mocapYaw: %lld\n",((uint64_t((mocap_yaw_+2*M_PI)*1e4)))*10);
-	return   ((uint64_t((mocap_yaw_+2*M_PI)*1e4)))*10;
+//	return   ((uint64_t((mocap_yaw_+2*M_PI)*1e4)))*10;
+	return   ((uint64_t((mocap_yaw_+2*M_PI)*1e4)))*10+ uint64_t(floor((1-quad_roll_offset_)*10000))*1e6+uint64_t(floor((1-quad_pitch_offset_)*10000))*1e11;
 //	return   get_time_usec();
 	//delay test
 }
@@ -248,6 +252,7 @@ Autopilot_Interface::Autopilot_Interface(UDP_Client& udp_client_,uint64_t platfo
 	std::cout<<udp_client_.port<<std::endl;
 
 	udp_client = &udp_client_; // client port management object
+	client = 0;
 	std::cout<<udp_client->port<<std::endl;
 	platform_epoch_64 =  platform_epoch_64_;
 
@@ -259,6 +264,20 @@ Autopilot_Interface::Autopilot_Interface(UDP_Client& udp_client_,uint64_t platfo
 	target_mocap.pitch=0;
 	target_mocap.yaw=0;
 
+	filtVx = 0.0;
+	filtVy = 0.0;
+	filtVz = 0.0;
+
+	current_mocap_value.x=0;
+	current_mocap_value.y=0;
+	current_mocap_value.z=0;
+	current_mocap_value.roll=0;
+	current_mocap_value.pitch=0;
+	current_mocap_value.yaw=0;
+
+	previous_mocap_value = current_mocap_value;
+
+	currentMocapRead = get_time_usec();
 
 
 }
@@ -616,7 +635,11 @@ Autopilot_Interface::
 write_mocap_floats()
 {
 
-	current_mocap_value.usec = get_time_since_epoch_embed_yaw(mocap_yaw,platform_epoch_64);
+	current_mocap_value.usec = get_time_since_epoch_embed_yaw(mocap_yaw,platform_epoch_64, quad_roll_offset, quad_pitch_offset);
+	uint64_t pp = floor(current_mocap_value.usec/100000000000);
+	uint64_t rr = floor((current_mocap_value.usec-pp*100000000000)/1000000);
+	uint64_t yy = current_mocap_value.usec-pp*100000000000- rr*1000000;
+	cout<< "coded val:  "<< current_mocap_value.usec<<"\t"<<1-pp/1e4<<"\t"<<1-rr/1e4<<"\t"<<yy/1e5-2*M_PI<<"\n";
 
 	__mavlink_vicon_position_estimate_t pos_est = current_mocap_value;
 //	__mavlink_sim_state_t allposes = Mocap_Value;
@@ -629,12 +652,12 @@ write_mocap_floats()
 
     if (vicon_message_counter<=10){
  	   pos_est.usec = 2;
- 	   pos_est.x=1500.0;
- 	   pos_est.y=1100.0;
+ 	   pos_est.x=1000.0;
+ 	   pos_est.y=600.0;
  	   pos_est.z=0.0;
 
- 	   pos_est.roll=0.2;
- 	   pos_est.pitch=0.2;
+ 	   pos_est.roll=0.23;
+ 	   pos_est.pitch=0.23;
  	   pos_est.yaw=0.0;
     }
 
@@ -643,10 +666,10 @@ write_mocap_floats()
     }
     if (vicon_message_counter>=21 && vicon_message_counter<=30){
     	attitude_gain.usec = 5;
-    	attitude_gain.x = 0.06;
-    	attitude_gain.y = 0.01;
-    	attitude_gain.z = 0.2;
-    	attitude_gain.roll = 0.05;
+    	attitude_gain.x = 0.02;
+    	attitude_gain.y = 0.0;
+    	attitude_gain.z = 0.1;
+    	attitude_gain.roll = 0.02;
     	pos_est = attitude_gain;
     }
 

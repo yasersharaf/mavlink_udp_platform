@@ -143,6 +143,9 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 
 	bool valid;
 	MocapFrame frame;
+	std::pair<MocapFrame, struct timespec> frameAndTime;
+	struct timespec mocap_current_ts;
+	struct timespec mocap_previous_ts;
 	Globals::run = true;
     Gnuplot gp;
     Gnuplot gpxy;
@@ -151,37 +154,100 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 
 
     int readFromMocapCounter = 0; //for gnu
+    int rollMemCounter = 0;
+    int pitchMemCounter = 0;
+
 //	  gp.close();
     std::string fileName  = "log"+std::to_string(get_time_usec())+".txt";
 	logFile.open(fileName);
 
+//	printf("=================================================== \t Log file opened!===================================================\n=========================================================================================================================================================\n=========================================================================================================================================================\n");
+
+
+
+
 	while (Globals::run) {
 		//TODO:::
-		MocapFrame frame(frameListener.pop(&valid).first);
+//		printf("=================================================== \t Running!===================================================\n");
+
+		frameAndTime = frameListener.pop(&valid);
+
+//		MocapFrame frame(frameListener.pop(&valid).first);
 		// Quit if the listener has no more frames.
-//		if (!valid)
-//			printf("Mocap Validity Issue.\n");
-//			break;
+		if (!valid){
+//			printf("No frame yet.\n");
+			usleep(1e3);
+//			printf("=================================================== \t Retrying!===================================================\n");
+
+			continue;
+		}
+		else{
+//			printf("=================================================== \t Got it!===================================================\n");
+		}
+		frame = frameAndTime.first;
+		mocap_current_ts = frameAndTime.second;
+
 
 		std::vector<RigidBody> const& rBodies = frame.rigidBodies();
 //		rBodies.
 //		uint16_t numerOfBodies = rBodies.size();
 //TODO:::
 		if (rBodies.size()<api.size()){
-			fprintf (stderr, "Rigid bodies less than ap interfaces!\n");
+			fprintf (stderr, "\n\n Rigid bodies less than ap interfaces!\n\n\n");
 			std::cout<<"num ap inter: "<<api.size()<<"num rigid bodies: "<<rBodies.size()<<std::endl;
 			break;
 		}
 		else if (rBodies.size()<api.size()){
-			fprintf (stderr, "Rigid bodies more than ap interfaces!\n");
+			fprintf (stderr, "\n\n Rigid bodies more than ap interfaces!\n\n\n");
 			break;
 		}
 
 		float roll= 0;
 		float pitch= 0;
 		float yaw = 0;
+
+		float ax_body_hover = 0;
+		float ay_body_hover = 0;
+		float az_body_hover = 0;
+
+		float ax_hover = 0;
+		float ay_hover = 0;
+		float az_hover = 0;
+
 		float dt =0;
+		float dt2 =0;
 		uint64_t u_dt = 0;
+		dt2 =  (std::abs(static_cast<float>(mocap_current_ts.tv_sec-mocap_previous_ts.tv_sec)*1000.f
+	                + (static_cast<float>(mocap_current_ts.tv_nsec)-static_cast<float>(mocap_previous_ts.tv_nsec))/1000000))/1000;
+		if (dt2>0.9){
+			fprintf (stderr, "Time wrapped!\n");
+			printf("Time wrapped\n");
+			std::cout<<"actual:"<<static_cast<float>(mocap_current_ts.tv_sec)<<"\t"<<static_cast<float>(mocap_previous_ts.tv_sec)<<"\n";
+			std::cout<<"diff"<<static_cast<float>(mocap_current_ts.tv_sec-mocap_previous_ts.tv_sec)*1.f<<"\t"<<(static_cast<float>(mocap_current_ts.tv_nsec)-static_cast<float>(mocap_previous_ts.tv_nsec))/1e9<<"\n";
+			fprintf (stderr, "Time wrapped!\n");
+		}
+		if (readFromMocapCounter == 0){
+			mocap_previous_ts = mocap_current_ts;
+			readFromMocapCounter++;
+			continue;
+
+		}
+		if (dt2>3e-2){
+//			mocap_previous_ts = mocap_current_ts;
+			cout<<"\t\tdt2 = "<<dt2 <<"old data; getting more data at:"<<get_time_usec() <<"\n";
+			cout<<"\t\tdt2 = "<<dt2 <<"old data; getting more data \n";
+			cout<<"\t\tdt2 = "<<dt2 <<"old data; getting more data \n";
+			cout<<"\t\tdt2 = "<<dt2 <<"old data; getting more data \n";
+			cout<<"\t\tdt2 = "<<dt2 <<"old data; getting more data \n";
+//			continue;
+		}
+		if (dt2<6e-3){
+			dt2 = 8.3e-3;
+		}
+		else if(dt>2e-2){
+			dt = 2e-2;
+		}
+		mocap_previous_ts = mocap_current_ts;
 		for(uint16_t api_ctr =0; api_ctr<api.size();api_ctr++){
 //			printf("\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t %f\n",api[api_ctr].target_mocap.z);
 //TODO:::
@@ -196,28 +262,99 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 			api[api_ctr].current_mocap_value.y = rBodies[api_ctr].location().x;
 			api[api_ctr].current_mocap_value.z = rBodies[api_ctr].location().y;
 
+			if (api[api_ctr].previous_mocap_value.x == 0){
+				printf("resettig prev mocap val\n");
+				printf("resettig prev mocap val\n");
+				api[api_ctr].previous_mocap_value = api[api_ctr].current_mocap_value;
+			}
+
+//			std::cout<<"mocapval: "<<"\t"<<api[api_ctr].previous_mocap_value.x<<"\t"<<api[api_ctr].current_mocap_value.x<<std::endl;
+
 //						api[api_ctr].current_mocap_value.usec = get_time_usec();
 //						api[api_ctr].current_mocap_value.x = rand();
 //						api[api_ctr].current_mocap_value.y = rand();
 //						api[api_ctr].current_mocap_value.z = rand();
 			u_dt = get_time_usec() - api[api_ctr].previous_mocap_value.usec;
 			dt = (float)(u_dt/1e6);
-			printf("dt = %f \n",dt);
+
+//			printf("dt = %f \t dt2 = %f \n",dt,dt2);
 			// filter
-			api[api_ctr].current_mocap_value.pitch = 0.7*api[api_ctr].current_mocap_value.pitch+ 0.3*(api[api_ctr].current_mocap_value.x-api[api_ctr].previous_mocap_value.x)/dt;
-			api[api_ctr].current_mocap_value.roll = 0.7*api[api_ctr].current_mocap_value.roll  + 0.3*(api[api_ctr].current_mocap_value.y-api[api_ctr].previous_mocap_value.y)/dt;
-			api[api_ctr].current_mocap_value.yaw =  0.7*api[api_ctr].current_mocap_value.yaw   + 0.3*(api[api_ctr].current_mocap_value.z-api[api_ctr].previous_mocap_value.z)/dt;
-//			api[api_ctr].current_mocap_value.pitch = pitch;
-//			api[api_ctr].current_mocap_value.roll = roll;
-//			api[api_ctr].current_mocap_value.yaw = yaw;
+
+			ax_body_hover = tan(-(roll -api[api_ctr].mocap_roll_offset))*9.81;
+			ay_body_hover = tan(pitch - api[api_ctr].mocap_pitch_offset)*9.81;
+
+			ax_hover = cosf(yaw)*ax_body_hover-sinf(yaw)*ay_body_hover;
+			ay_hover = sinf(yaw)*ax_body_hover+cosf(yaw)*ay_body_hover;
+//			std::cout<<"accel:\t"<<ax_body_hover<<"\t"<<ay_body_hover<<"\t"<<ax_hover<<"\t"<<ay_hover<<"\t"<<api[api_ctr].filtVx<<"\t"<<api[api_ctr].filtVy<<"\n";
+
+
+			api[api_ctr].noisyVx = (api[api_ctr].current_mocap_value.x-api[api_ctr].previous_mocap_value.x)/dt2;
+			api[api_ctr].noisyVy = (api[api_ctr].current_mocap_value.y-api[api_ctr].previous_mocap_value.y)/dt2;
+			api[api_ctr].noisyVz = (api[api_ctr].current_mocap_value.z-api[api_ctr].previous_mocap_value.z)/dt2;
+
+
+			api[api_ctr].filtVx = api[api_ctr].noisyVx*0.3+0.7*(api[api_ctr].filtVx+(1/120)*constrain_float((api[api_ctr].noisyVx-api[api_ctr].filtVx)*120,
+					tan((roll)-0.02)*9.81,tan((roll)+0.02)*9.81));
+			api[api_ctr].filtVy = api[api_ctr].noisyVy*0.3+0.7*(api[api_ctr].filtVy+(1/120)*constrain_float((api[api_ctr].noisyVy-api[api_ctr].filtVy)*120,
+					tan(-pitch -0.02)*9.81,tan(-pitch+0.02)*9.81));
+
+			api[api_ctr].current_mocap_value.pitch = api[api_ctr].filtVx;
+			api[api_ctr].current_mocap_value.roll  = api[api_ctr].filtVy;
+			api[api_ctr].current_mocap_value.yaw =  0.8*api[api_ctr].current_mocap_value.yaw   + 0.2*api[api_ctr].noisyVz;
+
+			api[api_ctr].smoothVx = api[api_ctr].smoothVx*0.97+0.03*api[api_ctr].filtVx;
+			api[api_ctr].smoothVy = api[api_ctr].smoothVy*0.97+0.03*api[api_ctr].filtVy;
+
+			api[api_ctr].quadFiltRoll  = api[api_ctr].quadFiltRoll *0.97+ 0.03*api[api_ctr].received_mocap_value.x;
+			api[api_ctr].quadFiltPitch = api[api_ctr].quadFiltPitch*0.97+ 0.03*api[api_ctr].received_mocap_value.roll;
+
+			api[api_ctr].mocapAccelRealTimeX = std::atan((api[api_ctr].smoothVx_prev-api[api_ctr].smoothVx)*120/9.81);
+			api[api_ctr].mocapAccelRealTimeY = std::atan((api[api_ctr].smoothVy-api[api_ctr].smoothVy_prev)*120/9.81);
+
+			if (readFromMocapCounter>2500 && abs(api[api_ctr].received_mocap_value.yaw + 2)< 1e-5){
+				api[api_ctr].quad_roll_offset  = constrain_float(-(-api[api_ctr].mocapAccelRealTimeX +  api[api_ctr].quadFiltRoll),-0.05,0.05);
+				api[api_ctr].quad_pitch_offset = constrain_float(-(-api[api_ctr].mocapAccelRealTimeY + api[api_ctr].quadFiltPitch),-0.05,0.05);
+//				api[api_ctr].mocap_roll_offset = 0.0;
+//				api[api_ctr].mocap_pitch_offset = 0.0;
+//
+//				api[api_ctr].quad_roll_offset  = 0.0;
+//				api[api_ctr].quad_pitch_offset = 0.0;
+//
+//
+//				api[api_ctr].quad_roll_offset  = api[api_ctr].quad_roll_offset*0.5 + 0.1*(roll -api[api_ctr].mocap_roll_offset   +  api[api_ctr].received_mocap_value.x);
+//				api[api_ctr].quad_pitch_offset = api[api_ctr].quad_pitch_offset*0.9+ 0.1*(pitch - api[api_ctr].mocap_pitch_offset + api[api_ctr].received_mocap_value.roll);
+				printf("\n\t\t\t\t\t\t\t\t\t\t\tfilt: %d , %f , %f \n",readFromMocapCounter,
+						abs(api[api_ctr].received_mocap_value.yaw + 2));
+
+			}
+
+
+			else{
+				printf("\n\t\t\t\t\t\t\t\t\t\t\tno filt: %d , %f , %f \n",readFromMocapCounter,
+						abs(api[api_ctr].received_mocap_value.yaw + 2));
+			}
+			cout<<"preprocess: "<<api[api_ctr].quad_roll_offset<<"\t"<<api[api_ctr].quad_pitch_offset<<"\n";
+
+
+			cout<<"postprocess: "<<api[api_ctr].quad_roll_offset<<"\t"<<api[api_ctr].quad_pitch_offset<<"\n";
+
+			logFile<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw
+					<<"\t"<<roll<<"\t"<<pitch<<"\t"<<api[api_ctr].current_mocap_value.pitch<<"\t"<<api[api_ctr].current_mocap_value.roll<<"\t"<<api[api_ctr].filtVx<<"\t"<<api[api_ctr].filtVy
+					<<"\t"<<dt2<<"\t"<<api[api_ctr].current_mocap_value.x<<"\t"<<api[api_ctr].current_mocap_value.y<<"\t"<<api[api_ctr].current_mocap_value.z<<"\t"<<get_time_usec()<<"\t"<<yaw
+					<<"\t"<<(api[api_ctr].current_mocap_value.x-api[api_ctr].previous_mocap_value.x)/dt2<<"\t"<<(api[api_ctr].current_mocap_value.y-api[api_ctr].previous_mocap_value.y)/dt2
+					<<"\t"<< api[api_ctr].smoothVx<<"\t"<<api[api_ctr].smoothVy
+					<<"\t"<<api[api_ctr].quadFiltRoll<<"\t"<<api[api_ctr].quadFiltPitch
+					<<"\t"<<api[api_ctr].mocapAccelRealTimeX<<"\t"<<api[api_ctr].mocapAccelRealTimeY
+					<<"\t"<<api[api_ctr].quad_roll_offset<<"\t"<<api[api_ctr].quad_pitch_offset
+					<<"\t"<<api[api_ctr].mocap_roll_offset<<"\t"<<api[api_ctr].mocap_pitch_offset
+					<<"\n";
+//			std::cout<<"apival:"<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<"\n";
 			api[api_ctr].previous_mocap_value = api[api_ctr].current_mocap_value;
+			api[api_ctr].smoothVx_prev = api[api_ctr].smoothVx;
+			api[api_ctr].smoothVy_prev = api[api_ctr].smoothVy;
+
 			api[api_ctr].previous_mocap_value.usec = get_time_usec();
-//			logFile<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<yaw<<"\t"<<rBodies[api_ctr].location().z<<"\t"<<rBodies[api_ctr].location().x<<"\t"<<rBodies[api_ctr].location().y<<"\n";
-//			std::cout<<"apiVal: "<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\n";
-			printf("mocap: %f\t%f\t%f\t%f\t%f\t%f\n",api[api_ctr].current_mocap_value.x,api[api_ctr].current_mocap_value.y,api[api_ctr].current_mocap_value.z,roll,pitch,yaw);
-			//delay test
-			logFile<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<roll<<"\t"<<pitch<<"\n";
-			std::cout<<"apival:"<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<"\n";
+
 			//plottingdata
 			if (readFromMocapCounter%11==0){
 
@@ -238,7 +375,7 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 //				gpxy.send1d(dataxy);
 			}
 		}
-		usleep(8340);
+		usleep(100);
 		readFromMocapCounter++;
 
 	}
@@ -267,8 +404,8 @@ int top(int argc, char **argv) {
 #endif
 
 
-		unsigned char natNetMajor  = 2;
-		unsigned char natNetMinor = 10;
+		unsigned char natNetMajor  = 3;
+		unsigned char natNetMinor = 0;
 
 		// Sockets
 		int sdCommand;
@@ -308,6 +445,7 @@ int top(int argc, char **argv) {
 		sdData = NatNet::createDataSocket(Globals::localAddress);
 		// Start up a FrameListener in a new thread.
 		FrameListener frameListener(sdData, natNetMajor, natNetMinor);
+		printf("start 1");
 		frameListener.start();
 		usleep(2e5);
 	// --------------------------------------------------------------------------
@@ -347,6 +485,7 @@ int top(int argc, char **argv) {
 		autopilot_interfaces.push_back(Autopilot_Interface(udp_clients[udp_ctr],platform_epoch));
 
 	}
+
 	autopilot_interface_quit = &autopilot_interfaces;
 	udp_client_quit = &udp_clients;
 
@@ -359,7 +498,8 @@ int top(int argc, char **argv) {
 	 */
 
 //	client.open_connection();
-	autopilot_interfaces[0].set_position_vicon_message(0.0 , 0.0, 1.7);
+	autopilot_interfaces[0].set_position_vicon_message(1.0 , 0.0, 1.7);
+//	autopilot_interfaces[0].set_position_vicon_message(2.0 , 0.0, 1.7);
 	autopilot_interfaces[1].set_position_vicon_message(0.75,  0.0, 1.7);
 	autopilot_interfaces[2].set_position_vicon_message(0.75 ,-2.5, 1.7);
 	for(uint8_t udp_ctr =0; udp_ctr<udp_clients.size();udp_ctr++){
@@ -679,7 +819,7 @@ void quit_handler(int sig) {
 }
 void quat2Euler(float qx,float qy,float qz,float qw,  float& roll, float& pitch, float& yaw){
 
-	printf("q: %f\t%f\t%f\t%f\t",qx,qy,qz,qw);
+//	printf("q: %f\t%f\t%f\t%f\t",qx,qy,qz,qw);
 	double r11 = 2*(qy*qw + qx*qz);
 	double r12 = qx*qx - qy*qy - qz*qz + qw*qw;
 	double r21 =-2*(qz*qw - qx*qy);
@@ -687,7 +827,7 @@ void quat2Euler(float qx,float qy,float qz,float qw,  float& roll, float& pitch,
 	double r32 = qx*qx - qy*qy + qz*qz - qw*qw;
 	//-180 to 180 yaw
 	yaw   = (float)std::atan2( r11, r12 );
-	printf("yaw: %f\n\n",yaw);
+//	printf("yaw: %f\n\n",yaw);
 	//-90 to 90 pitch
 	pitch = (float)-std::asin( r21 );
 	//-180 to 180 roll
@@ -700,6 +840,17 @@ void quat2Euler(float qx,float qy,float qz,float qw,  float& roll, float& pitch,
 
 
 }
+
+float constrain_float (float original,float lower,float upper){
+	if (original> upper)
+		return upper;
+	else if (original<lower)
+		return lower;
+	else
+		return original;
+}
+
+
 // ------------------------------------------------------------------------------
 //   Main
 // ------------------------------------------------------------------------------

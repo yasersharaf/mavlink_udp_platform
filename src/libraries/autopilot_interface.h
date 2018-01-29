@@ -63,6 +63,7 @@
 #include <sys/time.h>
 #include "pthread.h"
 #include "mavlink/v1.0/common/mavlink.h"
+#include <vector>
 
 
 
@@ -278,6 +279,14 @@ public:
 	__mavlink_vicon_position_estimate_t attitude_gain;
 	__mavlink_sim_state_t Mocap_Value;
 	int vicon_message_counter = 0;
+	float filtVx=0;
+	float filtVy=0;
+	float filtVz=0;
+	float noisyVx=0;
+	float noisyVy=0;
+	float noisyVz=0;
+
+
 
 
 
@@ -300,6 +309,22 @@ public:
 	void land_command();
 	float mocap_yaw;
 	uint64_t platform_epoch_64;
+	float quad_roll_offset= 0;
+	float quad_pitch_offset= 0;
+	float mocap_roll_offset= 0;
+	float mocap_pitch_offset= 0;
+	float mocapAccelRealTimeX= 0;
+	float mocapAccelRealTimeY= 0;
+	float smoothVx= 0;
+	float smoothVy= 0;
+	float smoothVx_prev = 0;
+	float smoothVy_prev = 0;
+	float quadFiltRoll = 0;
+	float quadFiltPitch= 0;
+
+//	std::vector<double> mocap_roll_mem(1200);
+//	std::vector<double> mocap_pitch_mem(1200);
+
 
 
 private:

@@ -43,7 +43,7 @@ using namespace std;
 int main(int argc, char **argv);
 int top(int argc, char **argv);
 void quat2Euler(float qx,float qy,float qz,float qw,  float& roll, float& pitch, float& yaw);
-
+float constrain_float (float,float,float);
 void commands(Autopilot_Interface &autopilot_interface);
 void parse_commandline(int argc, char **argv, char *&uart_name, int &baudrate);
 void readOpts(int argc, char* argv[]);
