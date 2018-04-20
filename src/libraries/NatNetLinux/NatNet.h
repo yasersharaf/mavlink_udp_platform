@@ -463,7 +463,14 @@ public:
       
       // Rigid body ID
       memcpy(&_id,data,4); data += 4;
-      
+      if (_id!=1){
+//    	  while(1){
+//    	      memcpy(&_loc.x,data,4); data += 2;
+//    	      printf("\nX:%f \n",_loc.x);
+//
+//    	  }
+    	  data+=6;
+      }
       // Location and orientation.
       memcpy(&_loc.x,data,4); data += 4;
       memcpy(&_loc.y,data,4); data += 4;
@@ -472,7 +479,7 @@ public:
       memcpy(&_ori.qy,data,4); data += 4;
       memcpy(&_ori.qz,data,4); data += 4;
       memcpy(&_ori.qw,data,4); data += 4;
-      
+
       if( nnMajor <= 2 ){
 		  // Associated markers
 		  int nMarkers = 0;
@@ -599,7 +606,6 @@ public:
       strncpy(n,data,sizeof(n)-1);
       _name = n;
       data += strlen(n)+1;
-      
       memcpy(&numMarkers, data, 4); data += 4;
       for( i = 0; i < numMarkers; ++i )
       {
@@ -907,6 +913,7 @@ public:
       
       // Get marker sets.
       memcpy(&_numMarkerSets, data, 4); data += 4;
+	 std::cout<<"numSet: "<<_numMarkerSets<<"\n";
       for( i = 0; i < _numMarkerSets; ++i )
       {
          MarkerSet set;
@@ -916,6 +923,7 @@ public:
       
       // Get unidentified markers.
       memcpy(&numUidMarkers,data,4); data += 4;
+   	 std::cout<<"numUMarkers: "<<numUidMarkers<<"\n";
       for( i = 0; i < numUidMarkers; ++i )
       {
          memcpy(&x,data,4); data += 4;

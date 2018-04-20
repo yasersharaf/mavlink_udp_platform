@@ -332,10 +332,14 @@ Autopilot_Interface::change_mode_then_arm_disarm(bool arm_disarm,bool is_mc)
 void
 Autopilot_Interface::land_command()
 {
+	target_mocap.x =  current_mocap_value.x;
+	target_mocap.y =  current_mocap_value.y;
+	target_mocap.z =  0;
+
 	__mavlink_vicon_position_estimate_t pos_est = target_mocap;
-	target_mocap.z   = 0;
+
 	pos_est = target_mocap;
-	printf("POSITION SETPOINT XYZ = [ %.4f , %.4f , %.4f ] \n", target_mocap.x, target_mocap.x, target_mocap.x);
+	printf("POSITION SETPOINT XYZ = [ %.4f , %.4f , %.4f ] \n", target_mocap.x, target_mocap.y, target_mocap.z);
     mavlink_message_t message;
     mavlink_msg_vicon_position_estimate_encode(system_id, companion_id, &message, &pos_est);
     int len = 0;
@@ -653,8 +657,8 @@ write_mocap_floats()
     if (vicon_message_counter<=10){
  	   pos_est.usec = 2;
  	   pos_est.x=1000.0;
- 	   pos_est.y=600.0;
- 	   pos_est.z=0.0;
+ 	   pos_est.y=700.0;
+ 	   pos_est.z=pixhawkVersion;
 
  	   pos_est.roll=0.23;
  	   pos_est.pitch=0.23;
@@ -670,10 +674,12 @@ write_mocap_floats()
     	attitude_gain.y = 0.0;
     	attitude_gain.z = 0.1;
     	attitude_gain.roll = 0.02;
+    	attitude_gain.pitch = flipInitialAccel;
+    	attitude_gain.yaw = flipAngVel;
     	pos_est = attitude_gain;
     }
 
-//           printf("---%ld \n\n",pos_est.usec);
+//       printf("---%ld \n\n",pos_est.usec);
 //       printf("%f \t  %f \t  %f \t %f \t  %f \t  %f \n\n",pos_est.x,pos_est.y,pos_est.z,pos_est.pitch,pos_est.roll, pos_est.yaw);
 
        mavlink_message_t message;
@@ -1022,6 +1028,7 @@ handle_quit( int sig )
 	try {
 		change_mode_then_arm_disarm(false,false);
 		land_command();
+		usleep(3.5e6);
 		stop();
 
 	}

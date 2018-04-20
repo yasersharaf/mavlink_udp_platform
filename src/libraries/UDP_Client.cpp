@@ -107,7 +107,7 @@ ssize_t UDP_Client::read_message(mavlink_message_t &msg){
 		mavlink_status_t status;
 //		mavlink_message_t msg;
 
-//		printf("Bytes Received: %d\nDatagram: ", (int)recsize);
+		printf("Bytes Received: %d\n", (int)recsize);
 		for (int i = 0; i < recsize; ++i)
 		{
 			temp = buf[i];

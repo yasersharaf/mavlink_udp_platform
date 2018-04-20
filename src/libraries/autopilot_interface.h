@@ -321,6 +321,9 @@ public:
 	float smoothVy_prev = 0;
 	float quadFiltRoll = 0;
 	float quadFiltPitch= 0;
+	float flipInitialAccel = 0;
+	float flipAngVel = 0;
+	float pixhawkVersion = 0;
 
 //	std::vector<double> mocap_roll_mem(1200);
 //	std::vector<double> mocap_pitch_mem(1200);

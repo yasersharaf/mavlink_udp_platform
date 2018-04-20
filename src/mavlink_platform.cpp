@@ -146,6 +146,8 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 	std::pair<MocapFrame, struct timespec> frameAndTime;
 	struct timespec mocap_current_ts;
 	struct timespec mocap_previous_ts;
+	uint32_t frameNum(1);
+	uint32_t frameNum_prev(1);
 	Globals::run = true;
     Gnuplot gp;
     Gnuplot gpxy;
@@ -186,9 +188,10 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 		}
 		frame = frameAndTime.first;
 		mocap_current_ts = frameAndTime.second;
-
+		frameNum = frame.frameNum();
 
 		std::vector<RigidBody> const& rBodies = frame.rigidBodies();
+
 //		rBodies.
 //		uint16_t numerOfBodies = rBodies.size();
 //TODO:::
@@ -226,8 +229,9 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 			std::cout<<"diff"<<static_cast<float>(mocap_current_ts.tv_sec-mocap_previous_ts.tv_sec)*1.f<<"\t"<<(static_cast<float>(mocap_current_ts.tv_nsec)-static_cast<float>(mocap_previous_ts.tv_nsec))/1e9<<"\n";
 			fprintf (stderr, "Time wrapped!\n");
 		}
-		if (readFromMocapCounter == 0){
+		if (readFromMocapCounter <= 1){
 			mocap_previous_ts = mocap_current_ts;
+
 			readFromMocapCounter++;
 			continue;
 
@@ -254,6 +258,10 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 			quat2Euler(rBodies[api_ctr].orientation().qx,rBodies[api_ctr].orientation().qy,rBodies[api_ctr].orientation().qz,rBodies[api_ctr].orientation().qw, roll, pitch, yaw);
 			api[api_ctr].mocap_yaw = yaw;
 
+			printf("yaw  %d = %f =? %f =========== \n",api_ctr,api[api_ctr].mocap_yaw,yaw);
+//			printf("++++++++++++++++++    =========== ++++++++++++++++: %f; %f    %f    %f\n",rBodies[api_ctr].orientation().qx,rBodies[api_ctr].orientation().qy,rBodies[api_ctr].orientation().qz,rBodies[api_ctr].orientation().qw);
+
+
 //			std::cout<<"yaw: "<<api[api_ctr].current_mocap_value.usec<<" yaw: "<<yaw<<std::endl;
 //			api[api_ctr].current_mocap_value.x = cos(M_PI/180*yaw)*rBodies[api_ctr].location().z +  sin(M_PI/180*yaw)*rBodies[api_ctr].location().x;
 //			api[api_ctr].current_mocap_value.y = -sin(M_PI/180*yaw)*rBodies[api_ctr].location().z +  cos(M_PI/180*yaw)*rBodies[api_ctr].location().x;
@@ -277,7 +285,11 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 			u_dt = get_time_usec() - api[api_ctr].previous_mocap_value.usec;
 			dt = (float)(u_dt/1e6);
 
-//			printf("dt = %f \t dt2 = %f \n",dt,dt2);
+			if (readFromMocapCounter>50){
+				dt2 = ((float)(frameNum - frameNum_prev))/120;
+			}
+
+			printf("dt = %f \t dt2 = %f \n",dt,dt2);
 			// filter
 
 			ax_body_hover = tan(-(roll -api[api_ctr].mocap_roll_offset))*9.81;
@@ -300,7 +312,7 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 
 			api[api_ctr].current_mocap_value.pitch = api[api_ctr].filtVx;
 			api[api_ctr].current_mocap_value.roll  = api[api_ctr].filtVy;
-			api[api_ctr].current_mocap_value.yaw =  0.8*api[api_ctr].current_mocap_value.yaw   + 0.2*api[api_ctr].noisyVz;
+			api[api_ctr].current_mocap_value.yaw =  0.2*api[api_ctr].current_mocap_value.yaw   + 0.8*api[api_ctr].noisyVz;
 
 			api[api_ctr].smoothVx = api[api_ctr].smoothVx*0.97+0.03*api[api_ctr].filtVx;
 			api[api_ctr].smoothVy = api[api_ctr].smoothVy*0.97+0.03*api[api_ctr].filtVy;
@@ -311,7 +323,7 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 			api[api_ctr].mocapAccelRealTimeX = std::atan((api[api_ctr].smoothVx_prev-api[api_ctr].smoothVx)*120/9.81);
 			api[api_ctr].mocapAccelRealTimeY = std::atan((api[api_ctr].smoothVy-api[api_ctr].smoothVy_prev)*120/9.81);
 
-			if (readFromMocapCounter>2500 && abs(api[api_ctr].received_mocap_value.yaw + 2)< 1e-5){
+			if (readFromMocapCounter>1000 && abs(api[api_ctr].received_mocap_value.yaw + 2)< 1e-5){
 				api[api_ctr].quad_roll_offset  = constrain_float(-(-api[api_ctr].mocapAccelRealTimeX +  api[api_ctr].quadFiltRoll),-0.05,0.05);
 				api[api_ctr].quad_pitch_offset = constrain_float(-(-api[api_ctr].mocapAccelRealTimeY + api[api_ctr].quadFiltPitch),-0.05,0.05);
 //				api[api_ctr].mocap_roll_offset = 0.0;
@@ -347,12 +359,12 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 					<<"\t"<<api[api_ctr].mocapAccelRealTimeX<<"\t"<<api[api_ctr].mocapAccelRealTimeY
 					<<"\t"<<api[api_ctr].quad_roll_offset<<"\t"<<api[api_ctr].quad_pitch_offset
 					<<"\t"<<api[api_ctr].mocap_roll_offset<<"\t"<<api[api_ctr].mocap_pitch_offset
-					<<"\n";
+					<<"\t"<<frameNum-frameNum_prev
+					<<"\t"<<api[api_ctr].current_mocap_value.yaw <<"\n";
 //			std::cout<<"apival:"<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<"\n";
 			api[api_ctr].previous_mocap_value = api[api_ctr].current_mocap_value;
 			api[api_ctr].smoothVx_prev = api[api_ctr].smoothVx;
 			api[api_ctr].smoothVy_prev = api[api_ctr].smoothVy;
-
 			api[api_ctr].previous_mocap_value.usec = get_time_usec();
 
 			//plottingdata
@@ -375,6 +387,7 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 //				gpxy.send1d(dataxy);
 			}
 		}
+		frameNum_prev = frameNum;
 		usleep(100);
 		readFromMocapCounter++;
 
@@ -476,7 +489,7 @@ int top(int argc, char **argv) {
 #else
 	std::vector<UDP_Client> udp_clients;
 	udp_clients.push_back(UDP_Client((std::string)APM_IP1,APM_PORT1,1,platform_epoch));
-//	udp_clients.push_back(UDP_Client((std::string)APM_IP2,APM_PORT2,2,platform_epoch));
+	udp_clients.push_back(UDP_Client((std::string)APM_IP2,APM_PORT2,2,platform_epoch));
 //	udp_clients.push_back(UDP_Client((std::string)APM_IP3,APM_PORT3,3,platform_epoch));
 //	udp_clients.push_back(UDP_Client((std::string)APM_IP4,APM_PORT4,4,platform_epoch));
 
@@ -498,10 +511,22 @@ int top(int argc, char **argv) {
 	 */
 
 //	client.open_connection();
-	autopilot_interfaces[0].set_position_vicon_message(1.0 , 0.0, 1.7);
-//	autopilot_interfaces[0].set_position_vicon_message(2.0 , 0.0, 1.7);
-	autopilot_interfaces[1].set_position_vicon_message(0.75,  0.0, 1.7);
-	autopilot_interfaces[2].set_position_vicon_message(0.75 ,-2.5, 1.7);
+	autopilot_interfaces[0].set_position_vicon_message( 4.0,  0.0, 1.7);
+	autopilot_interfaces[1].set_position_vicon_message( 0.0,  0.0, 2.0);
+//	autopilot_interfaces[2].set_position_vicon_message(0.75 ,-2.5, 1.7);
+
+	autopilot_interfaces[0].flipAngVel = 29.0;
+	autopilot_interfaces[1].flipAngVel = 30.0;
+//	autopilot_interfaces[2].flipAngVel = 30;
+
+	autopilot_interfaces[0].flipInitialAccel = +2.0;
+	autopilot_interfaces[1].flipInitialAccel = +1;
+//	autopilot_interfaces[2].flipInitialAccel = +2;
+
+	autopilot_interfaces[0].pixhawkVersion = 3;
+	autopilot_interfaces[1].pixhawkVersion = 2;
+//	autopilot_interfaces[2].pixhawkVersion = 3;
+
 	for(uint8_t udp_ctr =0; udp_ctr<udp_clients.size();udp_ctr++){
 		autopilot_interfaces[udp_ctr].start();
 	}
@@ -510,14 +535,14 @@ int top(int argc, char **argv) {
 
 	std::thread thisthread (printFrames,std::ref(frameListener),std::ref(autopilot_interfaces));
 
-	usleep(5e6);
+	usleep(4e6);
 
 	for(uint8_t udp_ctr =0; udp_ctr<udp_clients.size();udp_ctr++){
 		autopilot_interfaces[udp_ctr].change_mode_then_arm_disarm(true,true);
 	}
 
 	while(1){
-		usleep(1e6);
+		usleep(2e6);
 		printf("running");
 	}
 //	timeStats(frameListener);
@@ -812,6 +837,10 @@ void quit_handler(int sig) {
 		}
 	} catch (int error) {
 	}
+
+	usleep(4e6);
+
+
 
 	// end program here
 	exit(0);
