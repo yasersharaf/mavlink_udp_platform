@@ -63,6 +63,8 @@ uint64_t platform_epoch = 0;
 
 
 
+
+
 class Globals {
 public:
 
@@ -76,6 +78,8 @@ public:
 	static bool haveServerIP;
 	static bool haveLocalIP;
 	static bool obtainedIP;
+	static bool trackingEnable;
+
 };
 uint32_t Globals::localAddress = 0;
 uint32_t Globals::serverAddress = 0;
@@ -83,6 +87,7 @@ bool Globals::run = false;
 bool Globals::haveServerIP = false;
 bool Globals::haveLocalIP = false;
 bool Globals::obtainedIP = true;
+bool Globals::trackingEnable = false;
 
 // End the program gracefully.
 void terminate(int) {
@@ -148,6 +153,8 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 	struct timespec mocap_previous_ts;
 	uint32_t frameNum(1);
 	uint32_t frameNum_prev(1);
+	float targetX = 0;
+	float targetY = 0;
 	Globals::run = true;
     Gnuplot gp;
     Gnuplot gpxy;
@@ -200,7 +207,11 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 			std::cout<<"num ap inter: "<<api.size()<<"num rigid bodies: "<<rBodies.size()<<std::endl;
 			break;
 		}
-		else if (rBodies.size()<api.size()){
+		else if (rBodies.size() == api.size()+1){
+			fprintf (stderr, "\n\n ------------------> ------------------>  Tracking Enabled  ------------------> ------------------> \n\n\n");
+			Globals::trackingEnable = true;
+		}
+		else if (rBodies.size()>api.size()){
 			fprintf (stderr, "\n\n Rigid bodies more than ap interfaces!\n\n\n");
 			break;
 		}
@@ -339,11 +350,19 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 						abs(api[api_ctr].received_mocap_value.yaw + 2));
 
 			}
+			else if (abs(api[api_ctr].received_mocap_value.yaw + 5)<1e-5){
+
+				api[api_ctr].quad_roll_offset  = 0.25*targetX + 0.75* api[api_ctr].quad_roll_offset;
+				api[api_ctr].quad_pitch_offset = 0.25*targetY + 0.75* api[api_ctr].quad_pitch_offset;
+
+				fprintf (stderr, "\n\n ======   %f========> ======   %f========>  Tracking Mode  =======  %f=======> ======   %f========> \n\n\n",api[api_ctr].quad_roll_offset,api[api_ctr].quad_pitch_offset,api[api_ctr].received_mocap_value.y,api[api_ctr].received_mocap_value.z);
+
+
+			}
 
 
 			else{
-				printf("\n\t\t\t\t\t\t\t\t\t\t\tno filt: %d , %f , %f \n",readFromMocapCounter,
-						abs(api[api_ctr].received_mocap_value.yaw + 2));
+				printf("\n\t\t\t\t\t\t\t\t\t\t\tno filt: %d , %f  \n",readFromMocapCounter,abs(api[api_ctr].received_mocap_value.yaw + 2));
 			}
 			cout<<"preprocess: "<<api[api_ctr].quad_roll_offset<<"\t"<<api[api_ctr].quad_pitch_offset<<"\n";
 
@@ -352,7 +371,7 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 
 			logFile<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw
 					<<"\t"<<roll<<"\t"<<pitch<<"\t"<<api[api_ctr].current_mocap_value.pitch<<"\t"<<api[api_ctr].current_mocap_value.roll<<"\t"<<api[api_ctr].filtVx<<"\t"<<api[api_ctr].filtVy
-					<<"\t"<<dt2<<"\t"<<api[api_ctr].current_mocap_value.x<<"\t"<<api[api_ctr].current_mocap_value.y<<"\t"<<api[api_ctr].current_mocap_value.z<<"\t"<<get_time_usec()<<"\t"<<yaw
+					<<"\t"<<dt2<<"\t"<<rBodies[api_ctr].location().z<<"\t"<<rBodies[api_ctr].location().x<<"\t"<<rBodies[api_ctr].location().y<<"\t"<<get_time_usec()<<"\t"<<yaw
 					<<"\t"<<(api[api_ctr].current_mocap_value.x-api[api_ctr].previous_mocap_value.x)/dt2<<"\t"<<(api[api_ctr].current_mocap_value.y-api[api_ctr].previous_mocap_value.y)/dt2
 					<<"\t"<< api[api_ctr].smoothVx<<"\t"<<api[api_ctr].smoothVy
 					<<"\t"<<api[api_ctr].quadFiltRoll<<"\t"<<api[api_ctr].quadFiltPitch
@@ -386,6 +405,32 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 //				gp.send1d(data2);
 //				gpxy.send1d(dataxy);
 			}
+		}
+		if(Globals::trackingEnable){
+			quat2Euler(rBodies[api.size()].orientation().qx,rBodies[api.size()].orientation().qy,rBodies[api.size()].orientation().qz,rBodies[api.size()].orientation().qw, roll, pitch, yaw);
+			targetX =  constrain_float(( 3*sinf(yaw) + rBodies[api.size()].location().z)/100,-0.038,0.038);
+			targetY =  constrain_float((-3*cosf(yaw) + rBodies[api.size()].location().x)/100,-0.03,0.015);
+
+			cout<<"yaw:   "<<yaw<<"    target x: "<<targetX<<"    target y: "<<targetY<<"        locXXXX:"<<rBodies[api.size()].location().z<<"        locYYYY:"<<rBodies[api.size()].location().x<<endl;
+			int api_ctr = api.size();
+			logFile<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw
+					<<"\t"<<roll<<"\t"<<pitch<<"\t"<<api[api_ctr].current_mocap_value.pitch<<"\t"<<api[api_ctr].current_mocap_value.roll<<"\t"<<api[api_ctr].filtVx<<"\t"<<api[api_ctr].filtVy
+					<<"\t"<<dt2<<"\t"<<api[api_ctr].current_mocap_value.x<<"\t"<<api[api_ctr].current_mocap_value.y<<"\t"<<api[api_ctr].current_mocap_value.z<<"\t"<<get_time_usec()<<"\t"<<yaw
+					<<"\t"<<(api[api_ctr].current_mocap_value.x-api[api_ctr].previous_mocap_value.x)/dt2<<"\t"<<(api[api_ctr].current_mocap_value.y-api[api_ctr].previous_mocap_value.y)/dt2
+					<<"\t"<< api[api_ctr].smoothVx<<"\t"<<api[api_ctr].smoothVy
+					<<"\t"<<api[api_ctr].quadFiltRoll<<"\t"<<api[api_ctr].quadFiltPitch
+					<<"\t"<<api[api_ctr].mocapAccelRealTimeX<<"\t"<<api[api_ctr].mocapAccelRealTimeY
+					<<"\t"<<api[api_ctr].quad_roll_offset<<"\t"<<api[api_ctr].quad_pitch_offset
+					<<"\t"<<api[api_ctr].mocap_roll_offset<<"\t"<<api[api_ctr].mocap_pitch_offset
+					<<"\t"<<frameNum-frameNum_prev
+					<<"\t"<<api[api_ctr].current_mocap_value.yaw <<"\n";
+//			std::cout<<"apival:"<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<"\n";
+			api[api_ctr].previous_mocap_value = api[api_ctr].current_mocap_value;
+			api[api_ctr].smoothVx_prev = api[api_ctr].smoothVx;
+			api[api_ctr].smoothVy_prev = api[api_ctr].smoothVy;
+			api[api_ctr].previous_mocap_value.usec = get_time_usec();
+
+
 		}
 		frameNum_prev = frameNum;
 		usleep(100);
@@ -488,7 +533,7 @@ int top(int argc, char **argv) {
 	signal(SIGINT, quit_handler);
 #else
 	std::vector<UDP_Client> udp_clients;
-	udp_clients.push_back(UDP_Client((std::string)APM_IP1,APM_PORT1,1,platform_epoch));
+//	udp_clients.push_back(UDP_Client((std::string)APM_IP1,APM_PORT1,1,platform_epoch));
 	udp_clients.push_back(UDP_Client((std::string)APM_IP2,APM_PORT2,2,platform_epoch));
 //	udp_clients.push_back(UDP_Client((std::string)APM_IP3,APM_PORT3,3,platform_epoch));
 //	udp_clients.push_back(UDP_Client((std::string)APM_IP4,APM_PORT4,4,platform_epoch));
@@ -511,20 +556,23 @@ int top(int argc, char **argv) {
 	 */
 
 //	client.open_connection();
-	autopilot_interfaces[0].set_position_vicon_message( 4.0,  0.0, 1.7);
-	autopilot_interfaces[1].set_position_vicon_message( 0.0,  0.0, 2.0);
+	autopilot_interfaces[0].set_position_vicon_message( 0.0,  0.0, 1.7);
+//	autopilot_interfaces[1].set_position_vicon_message( 0.0,  0.0, 2.0);
 //	autopilot_interfaces[2].set_position_vicon_message(0.75 ,-2.5, 1.7);
 
-	autopilot_interfaces[0].flipAngVel = 29.0;
-	autopilot_interfaces[1].flipAngVel = 30.0;
+	// 29 for version 3, 30 for version 2
+	autopilot_interfaces[0].flipAngVel = 30.0;
+//	autopilot_interfaces[1].flipAngVel = 30.0;
 //	autopilot_interfaces[2].flipAngVel = 30;
 
-	autopilot_interfaces[0].flipInitialAccel = +2.0;
-	autopilot_interfaces[1].flipInitialAccel = +1;
+
+	// 2 for version 3, 1 for version 2 of pixhawk
+	autopilot_interfaces[0].flipInitialAccel = +1.0;
+//	autopilot_interfaces[1].flipInitialAccel = +1;
 //	autopilot_interfaces[2].flipInitialAccel = +2;
 
-	autopilot_interfaces[0].pixhawkVersion = 3;
-	autopilot_interfaces[1].pixhawkVersion = 2;
+	autopilot_interfaces[0].pixhawkVersion = 2;
+//	autopilot_interfaces[1].pixhawkVersion = 2;
 //	autopilot_interfaces[2].pixhawkVersion = 3;
 
 	for(uint8_t udp_ctr =0; udp_ctr<udp_clients.size();udp_ctr++){

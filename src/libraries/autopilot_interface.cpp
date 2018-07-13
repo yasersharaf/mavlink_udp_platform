@@ -304,6 +304,7 @@ Autopilot_Interface::set_position_vicon_message(float x, float y, float z)
 	target_mocap.x   = x;
 	target_mocap.y   = y;
 	target_mocap.z   = z;
+	target_mocap.roll   = 1.0/20;
 
 	printf("POSITION SETPOINT XYZ = [ %.4f , %.4f , %.4f ] \n", target_mocap.x, target_mocap.x, target_mocap.x);
 
@@ -656,7 +657,7 @@ write_mocap_floats()
 
     if (vicon_message_counter<=10){
  	   pos_est.usec = 2;
- 	   pos_est.x=1000.0;
+ 	   pos_est.x=1800.0;
  	   pos_est.y=700.0;
  	   pos_est.z=pixhawkVersion;
 
