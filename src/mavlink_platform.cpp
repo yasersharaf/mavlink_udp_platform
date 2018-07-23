@@ -89,6 +89,21 @@ bool Globals::haveLocalIP = false;
 bool Globals::obtainedIP = true;
 bool Globals::trackingEnable = false;
 
+float wrap180(float x){
+    x = fmod(x + 180,360);
+    if (x < 0)
+        x += 360;
+    return x - 180;
+}
+
+float wrapPi(float x){
+	x = 180*x/M_PI;
+    x = fmod(x + 180,360);
+    if (x < 0)
+        x += 360;
+    return (x*M_PI/180-1);
+}
+
 // End the program gracefully.
 void terminate(int) {
 	// Tell the main() thread to close.
@@ -146,6 +161,8 @@ std::string getIP(char* netType)
 // This thread loop just prints frames as they arrive.
 void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& api ) {
 
+	int throwAbleID(0);
+	bool thereIsAThrowable(false);
 	bool valid;
 	MocapFrame frame;
 	std::pair<MocapFrame, struct timespec> frameAndTime;
@@ -155,6 +172,10 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 	uint32_t frameNum_prev(1);
 	float targetX = 0;
 	float targetY = 0;
+	float targetZ = 0;
+	float targetYaw = 0;
+	float targetYaw_rel = 0;
+
 	Globals::run = true;
     Gnuplot gp;
     Gnuplot gpxy;
@@ -163,8 +184,6 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 
 
     int readFromMocapCounter = 0; //for gnu
-    int rollMemCounter = 0;
-    int pitchMemCounter = 0;
 
 //	  gp.close();
     std::string fileName  = "log"+std::to_string(get_time_usec())+".txt";
@@ -185,7 +204,7 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 		// Quit if the listener has no more frames.
 		if (!valid){
 //			printf("No frame yet.\n");
-			usleep(1e3);
+			usleep(5e2);
 //			printf("=================================================== \t Retrying!===================================================\n");
 
 			continue;
@@ -199,8 +218,42 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 
 		std::vector<RigidBody> const& rBodies = frame.rigidBodies();
 
-//		rBodies.
-//		uint16_t numerOfBodies = rBodies.size();
+		std::vector<LabeledMarker>lmm = frame.labledModellessMarkers();
+		LabeledMarker throwableMarker;
+		cout<<"There are "<<lmm.size()<<" markers that are not associated with a model in this frame\n";
+		thereIsAThrowable = false;
+		for (uint16_t m_i = 0 ; m_i< lmm.size(); m_i++){
+		   LabeledMarker lm = lmm[m_i];
+		   if (lm.id() == throwAbleID && lm.location().y>0.6){
+			   throwableMarker = lm;
+			   thereIsAThrowable = true;
+			   break;
+		   }
+		   if(lm.location().z>3.5 && lm.location().x>2.0 && lm.location().z<5 && lm.location().x<3.5){
+			   printf("case %d: MarkerID= %d is %sthrowable%s \n",m_i, lm.id(),KRED,KNRM);
+			   printf("        %sPosition = [%3.2f,%3.2f,%3.2f]%s\n",KRED, lm.location().x,lm.location().y,lm.location().z,KNRM);
+			   throwableMarker = lm;
+			   thereIsAThrowable = true;
+			   if (lm.id() == throwAbleID){
+				   break;
+			   }
+		   }
+		}
+
+		if(thereIsAThrowable){
+			throwAbleID = throwableMarker.id();
+			   printf("%sMarkerID= %d \n%s",KGRN, throwableMarker.id(),KNRM);
+			   printf("%sPosition = [%3.2f,%3.2f,%3.2f]%s\n",KGRN, throwableMarker.location().x,throwableMarker.location().y,throwableMarker.location().z,KNRM);
+			   targetX  = throwableMarker.location().z;
+			   targetY  = throwableMarker.location().x;
+			   targetZ  = throwableMarker.location().y;
+		}
+		else{
+			throwAbleID = 0;
+			targetX = 0;
+			targetY = 0;
+			targetZ = 0;
+		}
 //TODO:::
 		if (rBodies.size()<api.size()){
 			fprintf (stderr, "\n\n Rigid bodies less than ap interfaces!\n\n\n");
@@ -268,32 +321,33 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 //TODO:::
 			quat2Euler(rBodies[api_ctr].orientation().qx,rBodies[api_ctr].orientation().qy,rBodies[api_ctr].orientation().qz,rBodies[api_ctr].orientation().qw, roll, pitch, yaw);
 			api[api_ctr].mocap_yaw = yaw;
-
 			printf("yaw  %d = %f =? %f =========== \n",api_ctr,api[api_ctr].mocap_yaw,yaw);
 //			printf("++++++++++++++++++    =========== ++++++++++++++++: %f; %f    %f    %f\n",rBodies[api_ctr].orientation().qx,rBodies[api_ctr].orientation().qy,rBodies[api_ctr].orientation().qz,rBodies[api_ctr].orientation().qw);
 
 
-//			std::cout<<"yaw: "<<api[api_ctr].current_mocap_value.usec<<" yaw: "<<yaw<<std::endl;
-//			api[api_ctr].current_mocap_value.x = cos(M_PI/180*yaw)*rBodies[api_ctr].location().z +  sin(M_PI/180*yaw)*rBodies[api_ctr].location().x;
-//			api[api_ctr].current_mocap_value.y = -sin(M_PI/180*yaw)*rBodies[api_ctr].location().z +  cos(M_PI/180*yaw)*rBodies[api_ctr].location().x;
-//			api[api_ctr].current_mocap_value.z = rBodies[api_ctr].location().y;
-			api[api_ctr].current_mocap_value.x = rBodies[api_ctr].location().z;
-			api[api_ctr].current_mocap_value.y = rBodies[api_ctr].location().x;
-			api[api_ctr].current_mocap_value.z = rBodies[api_ctr].location().y;
+//			std::cout<<"yaw: "<<api[api_ctr].current_mocap_long_value.usec<<" yaw: "<<yaw<<std::endl;
+//			api[api_ctr].current_mocap_long_value.x = cos(M_PI/180*yaw)*rBodies[api_ctr].location().z +  sin(M_PI/180*yaw)*rBodies[api_ctr].location().x;
+//			api[api_ctr].current_mocap_long_value.y = -sin(M_PI/180*yaw)*rBodies[api_ctr].location().z +  cos(M_PI/180*yaw)*rBodies[api_ctr].location().x;
+//			api[api_ctr].current_mocap_long_value.z = rBodies[api_ctr].location().y;
+			api[api_ctr].current_mocap_long_value.x = rBodies[api_ctr].location().z;
+			api[api_ctr].current_mocap_long_value.y = rBodies[api_ctr].location().x;
+			api[api_ctr].current_mocap_long_value.z = rBodies[api_ctr].location().y;
 
-			if (api[api_ctr].previous_mocap_value.x == 0){
+			api[api_ctr].current_mocap_long_value.yaw_abs = yaw;
+
+			if (api[api_ctr].previous_mocap_long_value.x == 0){
 				printf("resettig prev mocap val\n");
 				printf("resettig prev mocap val\n");
-				api[api_ctr].previous_mocap_value = api[api_ctr].current_mocap_value;
+				api[api_ctr].previous_mocap_long_value = api[api_ctr].current_mocap_long_value;
 			}
 
-//			std::cout<<"mocapval: "<<"\t"<<api[api_ctr].previous_mocap_value.x<<"\t"<<api[api_ctr].current_mocap_value.x<<std::endl;
+//			std::cout<<"mocapval: "<<"\t"<<api[api_ctr].previous_mocap_long_value.x<<"\t"<<api[api_ctr].current_mocap_long_value.x<<std::endl;
 
-//						api[api_ctr].current_mocap_value.usec = get_time_usec();
-//						api[api_ctr].current_mocap_value.x = rand();
-//						api[api_ctr].current_mocap_value.y = rand();
-//						api[api_ctr].current_mocap_value.z = rand();
-			u_dt = get_time_usec() - api[api_ctr].previous_mocap_value.usec;
+//						api[api_ctr].current_mocap_long_value.usec = get_time_usec();
+//						api[api_ctr].current_mocap_long_value.x = rand();
+//						api[api_ctr].current_mocap_long_value.y = rand();
+//						api[api_ctr].current_mocap_long_value.z = rand();
+			u_dt = get_time_usec() - api[api_ctr].previous_mocap_long_value.usec;
 			dt = (float)(u_dt/1e6);
 
 			if (readFromMocapCounter>50){
@@ -311,9 +365,11 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 //			std::cout<<"accel:\t"<<ax_body_hover<<"\t"<<ay_body_hover<<"\t"<<ax_hover<<"\t"<<ay_hover<<"\t"<<api[api_ctr].filtVx<<"\t"<<api[api_ctr].filtVy<<"\n";
 
 
-			api[api_ctr].noisyVx = (api[api_ctr].current_mocap_value.x-api[api_ctr].previous_mocap_value.x)/dt2;
-			api[api_ctr].noisyVy = (api[api_ctr].current_mocap_value.y-api[api_ctr].previous_mocap_value.y)/dt2;
-			api[api_ctr].noisyVz = (api[api_ctr].current_mocap_value.z-api[api_ctr].previous_mocap_value.z)/dt2;
+			api[api_ctr].noisyVx = (api[api_ctr].current_mocap_long_value.x-api[api_ctr].previous_mocap_long_value.x)/dt2;
+			api[api_ctr].noisyVy = (api[api_ctr].current_mocap_long_value.y-api[api_ctr].previous_mocap_long_value.y)/dt2;
+			api[api_ctr].noisyVz = (api[api_ctr].current_mocap_long_value.z-api[api_ctr].previous_mocap_long_value.z)/dt2;
+
+
 
 
 			api[api_ctr].filtVx = api[api_ctr].noisyVx*0.3+0.7*(api[api_ctr].filtVx+(1/120)*constrain_float((api[api_ctr].noisyVx-api[api_ctr].filtVx)*120,
@@ -321,20 +377,32 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 			api[api_ctr].filtVy = api[api_ctr].noisyVy*0.3+0.7*(api[api_ctr].filtVy+(1/120)*constrain_float((api[api_ctr].noisyVy-api[api_ctr].filtVy)*120,
 					tan(-pitch -0.02)*9.81,tan(-pitch+0.02)*9.81));
 
-			api[api_ctr].current_mocap_value.pitch = api[api_ctr].filtVx;
-			api[api_ctr].current_mocap_value.roll  = api[api_ctr].filtVy;
-			api[api_ctr].current_mocap_value.yaw =  0.2*api[api_ctr].current_mocap_value.yaw   + 0.8*api[api_ctr].noisyVz;
+			api[api_ctr].current_mocap_long_value.Vx = api[api_ctr].filtVx;
+			api[api_ctr].current_mocap_long_value.Vy  = api[api_ctr].filtVy;
+			api[api_ctr].current_mocap_long_value.Vz =  0.2*api[api_ctr].current_mocap_long_value.Vz   + 0.8*api[api_ctr].noisyVz;
 
 			api[api_ctr].smoothVx = api[api_ctr].smoothVx*0.97+0.03*api[api_ctr].filtVx;
 			api[api_ctr].smoothVy = api[api_ctr].smoothVy*0.97+0.03*api[api_ctr].filtVy;
 
-			api[api_ctr].quadFiltRoll  = api[api_ctr].quadFiltRoll *0.97+ 0.03*api[api_ctr].received_mocap_value.x;
-			api[api_ctr].quadFiltPitch = api[api_ctr].quadFiltPitch*0.97+ 0.03*api[api_ctr].received_mocap_value.roll;
+			api[api_ctr].quadFiltRoll  = api[api_ctr].quadFiltRoll *0.97+ 0.03*api[api_ctr].received_mocap_long_value.Vx;
+			api[api_ctr].quadFiltPitch = api[api_ctr].quadFiltPitch*0.97+ 0.03*api[api_ctr].received_mocap_long_value.Vy;
 
 			api[api_ctr].mocapAccelRealTimeX = std::atan((api[api_ctr].smoothVx_prev-api[api_ctr].smoothVx)*120/9.81);
 			api[api_ctr].mocapAccelRealTimeY = std::atan((api[api_ctr].smoothVy-api[api_ctr].smoothVy_prev)*120/9.81);
 
-			if (readFromMocapCounter>1000 && abs(api[api_ctr].received_mocap_value.yaw + 2)< 1e-5){
+			if(!thereIsAThrowable){
+			api[api_ctr].current_mocap_long_value.target_x = 0.25*targetX + 0.75* api[api_ctr].current_mocap_long_value.target_x;
+			api[api_ctr].current_mocap_long_value.target_y = 0.25*targetY + 0.75* api[api_ctr].current_mocap_long_value.target_y;
+			api[api_ctr].current_mocap_long_value.target_z = 0.25*targetZ + 0.75* api[api_ctr].current_mocap_long_value.target_z;
+
+			cout<<"actual    "<<yaw<<"          target: "<<targetYaw<<"   diff   "<< (targetYaw+M_PI-yaw)*180/M_PI<<endl;
+			api[api_ctr].current_mocap_long_value.target_yaw_rel = 0.25*constrain_float((targetYaw+M_PI-yaw),-0.18,0.18) + 0.75* api[api_ctr].current_mocap_long_value.target_yaw_rel;
+			}
+
+			fprintf (stderr, "\n\n ======   %f========> ======   %f========>  Tracking Mode  =======  %f=======> ======   %f========> \n\n\n",api[api_ctr].current_mocap_long_value.target_x,api[api_ctr].current_mocap_long_value.target_y,targetX,targetY);
+
+
+			if (readFromMocapCounter>1000 && abs(api[api_ctr].received_mocap_long_value.Vz + 2)< 1e-2){
 				api[api_ctr].quad_roll_offset  = constrain_float(-(-api[api_ctr].mocapAccelRealTimeX +  api[api_ctr].quadFiltRoll),-0.05,0.05);
 				api[api_ctr].quad_pitch_offset = constrain_float(-(-api[api_ctr].mocapAccelRealTimeY + api[api_ctr].quadFiltPitch),-0.05,0.05);
 //				api[api_ctr].mocap_roll_offset = 0.0;
@@ -344,53 +412,65 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 //				api[api_ctr].quad_pitch_offset = 0.0;
 //
 //
-//				api[api_ctr].quad_roll_offset  = api[api_ctr].quad_roll_offset*0.5 + 0.1*(roll -api[api_ctr].mocap_roll_offset   +  api[api_ctr].received_mocap_value.x);
-//				api[api_ctr].quad_pitch_offset = api[api_ctr].quad_pitch_offset*0.9+ 0.1*(pitch - api[api_ctr].mocap_pitch_offset + api[api_ctr].received_mocap_value.roll);
-				printf("\n\t\t\t\t\t\t\t\t\t\t\tfilt: %d , %f , %f \n",readFromMocapCounter,
-						abs(api[api_ctr].received_mocap_value.yaw + 2));
+//				api[api_ctr].quad_roll_offset  = api[api_ctr].quad_roll_offset*0.5 + 0.1*(roll -api[api_ctr].mocap_roll_offset   +  api[api_ctr].received_mocap_long_value.x);
+//				api[api_ctr].quad_pitch_offset = api[api_ctr].quad_pitch_offset*0.9+ 0.1*(pitch - api[api_ctr].mocap_pitch_offset + api[api_ctr].received_mocap_long_value.roll);
+				printf("\n\t\t\t\t\t\t\t\t\t\t\tfilt: %d , %f \n", readFromMocapCounter, 2.34235252354353453453);
 
 			}
-			else if (abs(api[api_ctr].received_mocap_value.yaw + 5)<1e-5){
+			else if (abs(api[api_ctr].received_mocap_long_value.Vz + 5)<1e-2){
 
-				api[api_ctr].quad_roll_offset  = 0.25*targetX + 0.75* api[api_ctr].quad_roll_offset;
-				api[api_ctr].quad_pitch_offset = 0.25*targetY + 0.75* api[api_ctr].quad_pitch_offset;
 
-				fprintf (stderr, "\n\n ======   %f========> ======   %f========>  Tracking Mode  =======  %f=======> ======   %f========> \n\n\n",api[api_ctr].quad_roll_offset,api[api_ctr].quad_pitch_offset,api[api_ctr].received_mocap_value.y,api[api_ctr].received_mocap_value.z);
+				fprintf (stderr, "\n\n ======   %f========> ======   %f========>  Tracking Mode  =======  %f=======> ======   %f========> \n\n\n",api[api_ctr].current_mocap_long_value.target_x,api[api_ctr].current_mocap_long_value.target_y,api[api_ctr].received_mocap_long_value.y,api[api_ctr].received_mocap_long_value.z);
 
 
 			}
 
 
 			else{
-				printf("\n\t\t\t\t\t\t\t\t\t\t\tno filt: %d , %f  \n",readFromMocapCounter,abs(api[api_ctr].received_mocap_value.yaw + 2));
+				printf("\n\t\t\t\t\t\t\t\t\t\t\tno filt: %d , %f  \n",readFromMocapCounter,abs(api[api_ctr].received_mocap_long_value.Vz + 2));
 			}
 			cout<<"preprocess: "<<api[api_ctr].quad_roll_offset<<"\t"<<api[api_ctr].quad_pitch_offset<<"\n";
 
 
 			cout<<"postprocess: "<<api[api_ctr].quad_roll_offset<<"\t"<<api[api_ctr].quad_pitch_offset<<"\n";
 
-			logFile<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw
-					<<"\t"<<roll<<"\t"<<pitch<<"\t"<<api[api_ctr].current_mocap_value.pitch<<"\t"<<api[api_ctr].current_mocap_value.roll<<"\t"<<api[api_ctr].filtVx<<"\t"<<api[api_ctr].filtVy
+			if (thereIsAThrowable){
+				api[api_ctr].current_mocap_long_value.roll_rel  = (targetZ - api[api_ctr].current_mocap_long_value.target_z)/dt2;
+				cout<<"targetZ: "<<targetZ<<"\t"<<api[api_ctr].current_mocap_long_value.target_z<<endl;
+				api[api_ctr].current_mocap_long_value.pitch_rel = sqrtf(((targetX - api[api_ctr].current_mocap_long_value.target_x)/dt2)*((targetX - api[api_ctr].current_mocap_long_value.target_x)/dt2)+((targetY - api[api_ctr].current_mocap_long_value.target_y)/dt2)*((targetY - api[api_ctr].current_mocap_long_value.target_y)/dt2));
+
+				api[api_ctr].current_mocap_long_value.target_x  = targetX;
+				api[api_ctr].current_mocap_long_value.target_y  = targetY;
+				api[api_ctr].current_mocap_long_value.target_z  = targetZ;
+				printf("Throwale info:  %.2e %.2e x = %.2e y = %.2e z= %.2e\n ",api[api_ctr].current_mocap_long_value.roll_rel,api[api_ctr].current_mocap_long_value.pitch_rel,
+						api[api_ctr].current_mocap_long_value.target_x,api[api_ctr].current_mocap_long_value.target_y,api[api_ctr].current_mocap_long_value.target_z);
+			}
+			logFile<<api_ctr<<"\t"<<api[api_ctr].received_mocap_long_value.usec<<"\t"<<api[api_ctr].received_mocap_long_value.x<<"\t"<<api[api_ctr].received_mocap_long_value.y<<"\t"<<api[api_ctr].received_mocap_long_value.z<<"\t"<<api[api_ctr].received_mocap_long_value.Vx<<"\t"<<api[api_ctr].received_mocap_long_value.Vy<<"\t"<<api[api_ctr].received_mocap_long_value.Vz
+					<<"\t"<<roll<<"\t"<<pitch<<"\t"<<api[api_ctr].current_mocap_long_value.Vx<<"\t"<<api[api_ctr].current_mocap_long_value.Vy<<"\t"<<api[api_ctr].filtVx<<"\t"<<api[api_ctr].filtVy
 					<<"\t"<<dt2<<"\t"<<rBodies[api_ctr].location().z<<"\t"<<rBodies[api_ctr].location().x<<"\t"<<rBodies[api_ctr].location().y<<"\t"<<get_time_usec()<<"\t"<<yaw
-					<<"\t"<<(api[api_ctr].current_mocap_value.x-api[api_ctr].previous_mocap_value.x)/dt2<<"\t"<<(api[api_ctr].current_mocap_value.y-api[api_ctr].previous_mocap_value.y)/dt2
+					<<"\t"<<(api[api_ctr].current_mocap_long_value.x-api[api_ctr].previous_mocap_long_value.x)/dt2<<"\t"<<(api[api_ctr].current_mocap_long_value.y-api[api_ctr].previous_mocap_long_value.y)/dt2
 					<<"\t"<< api[api_ctr].smoothVx<<"\t"<<api[api_ctr].smoothVy
 					<<"\t"<<api[api_ctr].quadFiltRoll<<"\t"<<api[api_ctr].quadFiltPitch
 					<<"\t"<<api[api_ctr].mocapAccelRealTimeX<<"\t"<<api[api_ctr].mocapAccelRealTimeY
 					<<"\t"<<api[api_ctr].quad_roll_offset<<"\t"<<api[api_ctr].quad_pitch_offset
 					<<"\t"<<api[api_ctr].mocap_roll_offset<<"\t"<<api[api_ctr].mocap_pitch_offset
 					<<"\t"<<frameNum-frameNum_prev
-					<<"\t"<<api[api_ctr].current_mocap_value.yaw <<"\n";
-//			std::cout<<"apival:"<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<"\n";
-			api[api_ctr].previous_mocap_value = api[api_ctr].current_mocap_value;
+					<<"\t"<<api[api_ctr].current_mocap_long_value.Vz
+					<<"\t"<<api[api_ctr].received_mocap_long_value.roll_rel<<"\t"<<api[api_ctr].received_mocap_long_value.pitch_rel<<"\t"<<api[api_ctr].received_mocap_long_value.yaw_abs
+					<<"\t"<<api[api_ctr].received_mocap_long_value.target_x<<"\t"<<api[api_ctr].received_mocap_long_value.target_y<<"\t"<<api[api_ctr].received_mocap_long_value.target_z
+					<<"\t"<<api[api_ctr].current_mocap_long_value.roll_rel<<"\t"<<api[api_ctr].current_mocap_long_value.pitch_rel<<"\t"<<api[api_ctr].current_mocap_long_value.yaw_abs
+					<<"\t"<<api[api_ctr].current_mocap_long_value.target_x<<"\t"<<api[api_ctr].current_mocap_long_value.target_y<<"\t"<<api[api_ctr].current_mocap_long_value.target_z<<"\n";
+//			std::cout<<"apival:"<<api_ctr<<"\t"<<api[api_ctr].received_mocap_long_value.usec<<"\t"<<api[api_ctr].received_mocap_long_value.x<<"\t"<<api[api_ctr].received_mocap_long_value.y<<"\t"<<api[api_ctr].received_mocap_long_value.z<<"\t"<<api[api_ctr].received_mocap_long_value.roll<<"\t"<<api[api_ctr].received_mocap_long_value.pitch<<"\t"<<api[api_ctr].received_mocap_long_value.yaw<<"\t"<<"\n";
+			api[api_ctr].previous_mocap_long_value = api[api_ctr].current_mocap_long_value;
 			api[api_ctr].smoothVx_prev = api[api_ctr].smoothVx;
 			api[api_ctr].smoothVy_prev = api[api_ctr].smoothVy;
-			api[api_ctr].previous_mocap_value.usec = get_time_usec();
+			api[api_ctr].previous_mocap_long_value.usec = get_time_usec();
 
 			//plottingdata
 			if (readFromMocapCounter%11==0){
 
-//				data.emplace_back(readFromMocapCounter,api[api_ctr].current_mocap_value.x);
-//				data2.emplace_back(readFromMocapCounter,api[api_ctr].current_mocap_value.y);
+//				data.emplace_back(readFromMocapCounter,api[api_ctr].current_mocap_long_value.x);
+//				data2.emplace_back(readFromMocapCounter,api[api_ctr].current_mocap_long_value.y);
 //				dataxy.emplace_back(rBodies[api_ctr].location().z,rBodies[api_ctr].location().x);
 //
 //
@@ -405,32 +485,18 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 //				gp.send1d(data2);
 //				gpxy.send1d(dataxy);
 			}
+
+
 		}
-		if(Globals::trackingEnable){
+		if(Globals::trackingEnable && !thereIsAThrowable){
 			quat2Euler(rBodies[api.size()].orientation().qx,rBodies[api.size()].orientation().qy,rBodies[api.size()].orientation().qz,rBodies[api.size()].orientation().qw, roll, pitch, yaw);
-			targetX =  constrain_float(( 3*sinf(yaw) + rBodies[api.size()].location().z)/100,-0.038,0.038);
-			targetY =  constrain_float((-3*cosf(yaw) + rBodies[api.size()].location().x)/100,-0.03,0.015);
+			targetX =  constrain_float(( 3*sinf(yaw) + rBodies[api.size()].location().z),-3.8,3.8);
+			targetY =  constrain_float((-3*cosf(yaw) + rBodies[api.size()].location().x),-3.0,1.5);
+			targetZ =  constrain_float((3*sinf(pitch) + rBodies[api.size()].location().y),0.8,2.0);
+			targetYaw = yaw;
 
 			cout<<"yaw:   "<<yaw<<"    target x: "<<targetX<<"    target y: "<<targetY<<"        locXXXX:"<<rBodies[api.size()].location().z<<"        locYYYY:"<<rBodies[api.size()].location().x<<endl;
 			int api_ctr = api.size();
-			logFile<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw
-					<<"\t"<<roll<<"\t"<<pitch<<"\t"<<api[api_ctr].current_mocap_value.pitch<<"\t"<<api[api_ctr].current_mocap_value.roll<<"\t"<<api[api_ctr].filtVx<<"\t"<<api[api_ctr].filtVy
-					<<"\t"<<dt2<<"\t"<<api[api_ctr].current_mocap_value.x<<"\t"<<api[api_ctr].current_mocap_value.y<<"\t"<<api[api_ctr].current_mocap_value.z<<"\t"<<get_time_usec()<<"\t"<<yaw
-					<<"\t"<<(api[api_ctr].current_mocap_value.x-api[api_ctr].previous_mocap_value.x)/dt2<<"\t"<<(api[api_ctr].current_mocap_value.y-api[api_ctr].previous_mocap_value.y)/dt2
-					<<"\t"<< api[api_ctr].smoothVx<<"\t"<<api[api_ctr].smoothVy
-					<<"\t"<<api[api_ctr].quadFiltRoll<<"\t"<<api[api_ctr].quadFiltPitch
-					<<"\t"<<api[api_ctr].mocapAccelRealTimeX<<"\t"<<api[api_ctr].mocapAccelRealTimeY
-					<<"\t"<<api[api_ctr].quad_roll_offset<<"\t"<<api[api_ctr].quad_pitch_offset
-					<<"\t"<<api[api_ctr].mocap_roll_offset<<"\t"<<api[api_ctr].mocap_pitch_offset
-					<<"\t"<<frameNum-frameNum_prev
-					<<"\t"<<api[api_ctr].current_mocap_value.yaw <<"\n";
-//			std::cout<<"apival:"<<api_ctr<<"\t"<<api[api_ctr].received_mocap_value.usec<<"\t"<<api[api_ctr].received_mocap_value.x<<"\t"<<api[api_ctr].received_mocap_value.y<<"\t"<<api[api_ctr].received_mocap_value.z<<"\t"<<api[api_ctr].received_mocap_value.roll<<"\t"<<api[api_ctr].received_mocap_value.pitch<<"\t"<<api[api_ctr].received_mocap_value.yaw<<"\t"<<"\n";
-			api[api_ctr].previous_mocap_value = api[api_ctr].current_mocap_value;
-			api[api_ctr].smoothVx_prev = api[api_ctr].smoothVx;
-			api[api_ctr].smoothVy_prev = api[api_ctr].smoothVy;
-			api[api_ctr].previous_mocap_value.usec = get_time_usec();
-
-
 		}
 		frameNum_prev = frameNum;
 		usleep(100);
@@ -801,7 +867,7 @@ void readOpts(int argc, char* argv[]) {
 
 	if (!vm.count("server-addr")){
 		usleep (2e5);
-		printf("Warning: No server address specified!\n");
+		printf("%sWarning: No server address specified%s!\n",KYEL,KNRM);
 		Globals::haveServerIP = false;
 		usleep (2e5);
 	}
@@ -813,14 +879,14 @@ void readOpts(int argc, char* argv[]) {
 	if (!vm.count("local-addr")){
 		usleep (2e5);
 		Globals::haveLocalIP = false;
-		printf("Warning: No local address specified!\n");
+		printf("%sWarning: No local address specified!%s\n",KYEL,KNRM);
 		usleep (2e5);
-		printf("Trying Ethernet ...\n");
+		printf("%sTrying Ethernet ...%s\n",KMAG,KNRM);
 		usleep (2e5);
-		std::string  ethernetIP = getIP("e");
+		std::string  ethernetIP = getIP((char*) "e");
 		if (strcmp(ethernetIP.c_str(),"127.0.0.1")==0){
-			printf("Trying WIFI ...\n");
-			std::string  wifiIP = getIP("w");
+			printf("%sTrying WIFI ...%s\n",KRED,KNRM);
+			std::string  wifiIP = getIP((char*) "w");
 			if (strcmp(wifiIP.c_str(),"127.0.0.1")==0){
 				Globals::obtainedIP =false;
 			}

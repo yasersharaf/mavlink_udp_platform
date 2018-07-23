@@ -275,6 +275,12 @@ public:
 	__mavlink_vicon_position_estimate_t current_mocap_value;
 	__mavlink_vicon_position_estimate_t previous_mocap_value;
 	__mavlink_vicon_position_estimate_t received_mocap_value;
+	__mavlink_hil_rc_inputs_raw_t current_raw_mocap_long_value;
+	__mavlink_hil_rc_inputs_raw_t previous_raw_mocap_long_value;
+	__mavlink_hil_rc_inputs_raw_t received_raw_mocap_long_value;
+	__mavlink_optitrack_position_estimate_t current_mocap_long_value;
+	__mavlink_optitrack_position_estimate_t previous_mocap_long_value;
+	__mavlink_optitrack_position_estimate_t received_mocap_long_value;
 	__mavlink_vicon_position_estimate_t target_mocap;
 	__mavlink_vicon_position_estimate_t attitude_gain;
 	__mavlink_sim_state_t Mocap_Value;
@@ -353,6 +359,8 @@ private:
 	void write_setpoint();
 	void write_gps_raw_int();
 	void write_mocap_floats();
+	void process_raw_long_mocap(mavlink_hil_rc_inputs_raw_t* raw_mocap_long_value,__mavlink_optitrack_position_estimate_t* mocap_long_value);
+	void rev_process_float_long_mocap(mavlink_hil_rc_inputs_raw_t* raw_mocap_long_value,__mavlink_optitrack_position_estimate_t* mocap_long_value);
 
 };
 

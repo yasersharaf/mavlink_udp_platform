@@ -33,7 +33,7 @@ uint64_t UDP_Client::microsSinceEpoch()
 	uint64_t micros = 0;
 
 	gettimeofday(&tv, NULL);
-	micros =  ((uint64_t)tv.tv_sec) * 1000000 + tv.tv_usec;
+	micros =  ((uint64_t)tv.tv_sec) * 1000000L + (uint64_t)tv.tv_usec;
 
 	return micros;
 }
@@ -75,7 +75,7 @@ void UDP_Client::connect(){
 }
 
 uint16_t UDP_Client:: write_message(const mavlink_message_t &msg){
-	float position[6] = {};
+//	float position[6] = {};
 	uint8_t buf[buffer_length];
 //	std::cout<<"buffer length:"<<buffer_length<<std::endl;
 	int bytes_sent;
@@ -128,8 +128,8 @@ ssize_t UDP_Client::read_message(mavlink_message_t &msg){
 
 						uint64_t rcpt_time = microsSinceEpoch();
 
-//						printf("%lld\n",ned_message.time_boot_ms);
-						printf("%lld\n",rcpt_time);
+//						printf("%llu\n",ned_message.time_boot_ms);
+						printf("%llu\n",rcpt_time);
 						break;
 					}
 					case MAVLINK_MSG_ID_VICON_POSITION_ESTIMATE:
@@ -142,8 +142,23 @@ ssize_t UDP_Client::read_message(mavlink_message_t &msg){
 						uint64_t rcpt_time = microsSinceEpoch();
 
 //						printf("%ld\n",vicon_message.usec);
-//						printf("%lld\n",rcpt_time);
-						printf("\t\t\t\t\t\t\t\t\t\t\t\t\t\t delay %u = %lld\n",udp_id,rcpt_time-vicon_message.usec);
+//						printf("%llu\n",rcpt_time);
+						printf("%s\t\t\t\t\t\t\t\t\t\t\t\t\t\t delay %u = %llu\n%s",KMAG,udp_id,rcpt_time-vicon_message.usec,KNRM);
+
+						break;
+					}
+					case MAVLINK_MSG_ID_HIL_RC_INPUTS_RAW:
+					{
+						mavlink_hil_rc_inputs_raw_t optitrack_message;
+						mavlink_msg_hil_rc_inputs_raw_decode(&msg, &optitrack_message);
+
+//						printf("MAVLINK_MSG_ID_VICON_POSITION_ESTIMATE\n");
+
+						uint64_t rcpt_time = microsSinceEpoch();
+
+//						printf("%ld\n",vicon_message.usec);
+//						printf("%llu\n",rcpt_time);
+						printf("%s\t\t\t\t\t\t\t\t\t\t\t\t\t\t delay %u = %llu, %llu, %llu\n%s",KBLU,udp_id,rcpt_time-optitrack_message.time_usec,rcpt_time,optitrack_message.time_usec,KNRM);
 
 						break;
 					}

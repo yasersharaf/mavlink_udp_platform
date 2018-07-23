@@ -61,7 +61,7 @@ uint64_t get_time_usec()
 {
 	static struct timeval _time_stamp;
 	gettimeofday(&_time_stamp, NULL);
-	return _time_stamp.tv_sec*1000000 + _time_stamp.tv_usec;
+	return (uint64_t)_time_stamp.tv_sec*1000000L + (uint64_t)_time_stamp.tv_usec;
 
 }
 
@@ -76,7 +76,7 @@ uint64_t get_time_since_epoch_embed_yaw(float mocap_yaw_,uint64_t platform_epoch
 //	quad_roll_offset_ = 0.054321;
 //	quad_pitch_offset_ = 0.045678;
 	cout<< "\n packing: "<<mocap_yaw_<<"\t"<<quad_roll_offset_<<"\t"<<quad_pitch_offset_<<"\n";
-//	printf("mocapYaw: %lld\n",((uint64_t((mocap_yaw_+2*M_PI)*1e4)))*10);
+//	printf("mocapYaw: %llu\n",((uint64_t((mocap_yaw_+2*M_PI)*1e4)))*10);
 //	return   ((uint64_t((mocap_yaw_+2*M_PI)*1e4)))*10;
 	return   ((uint64_t((mocap_yaw_+2*M_PI)*1e4)))*10+ uint64_t(floor((1-quad_roll_offset_)*10000))*1e6+uint64_t(floor((1-quad_pitch_offset_)*10000))*1e11;
 //	return   get_time_usec();
@@ -375,6 +375,11 @@ read_messages()
 		{
 			mavlink_msg_vicon_position_estimate_decode(&message, &received_mocap_value);
 		}
+		if(message.msgid==MAVLINK_MSG_ID_HIL_RC_INPUTS_RAW)
+		{
+			mavlink_msg_hil_rc_inputs_raw_decode(&message, &received_raw_mocap_long_value);
+			process_raw_long_mocap(&received_raw_mocap_long_value,&received_mocap_long_value);
+		}
 
 		// ----------------------------------------------------------------------
 		//   HANDLE MESSAGE
@@ -639,15 +644,14 @@ void
 Autopilot_Interface::
 write_mocap_floats()
 {
-
-	current_mocap_value.usec = get_time_since_epoch_embed_yaw(mocap_yaw,platform_epoch_64, quad_roll_offset, quad_pitch_offset);
-	uint64_t pp = floor(current_mocap_value.usec/100000000000);
-	uint64_t rr = floor((current_mocap_value.usec-pp*100000000000)/1000000);
-	uint64_t yy = current_mocap_value.usec-pp*100000000000- rr*1000000;
-	cout<< "coded val:  "<< current_mocap_value.usec<<"\t"<<1-pp/1e4<<"\t"<<1-rr/1e4<<"\t"<<yy/1e5-2*M_PI<<"\n";
-
-	__mavlink_vicon_position_estimate_t pos_est = current_mocap_value;
-//	__mavlink_sim_state_t allposes = Mocap_Value;
+	current_mocap_long_value.usec = get_time_usec();
+//	current_mocap_value.usec = get_time_since_epoch_embed_yaw(mocap_yaw, platform_epoch_64, quad_roll_offset, quad_pitch_offset);
+//	uint64_t pp = floor(current_mocap_value.usec/100000000000);
+//	uint64_t rr = floor((current_mocap_value.usec-pp*100000000000)/1000000);
+//	uint64_t yy = current_mocap_value.usec-pp*100000000000- rr*1000000;
+//	cout<< "coded val:  "<< current_mocap_value.usec<<"\t"<<1-pp/1e4<<"\t"<<1-rr/1e4<<"\t"<<yy/1e5-2*M_PI<<"\n";
+	rev_process_float_long_mocap(&current_raw_mocap_long_value, &current_mocap_long_value);
+	__mavlink_hil_rc_inputs_raw_t pos_est = current_raw_mocap_long_value;
 	// --------------------------------------------------------------------------
        //   ENCODE
        // --------------------------------------------------------------------------
@@ -656,36 +660,39 @@ write_mocap_floats()
 
 
     if (vicon_message_counter<=10){
- 	   pos_est.usec = 2;
- 	   pos_est.x=1800.0;
- 	   pos_est.y=700.0;
- 	   pos_est.z=pixhawkVersion;
+ 	   pos_est.time_usec = 2;
+ 	   pos_est.chan1_raw = 1800;
+ 	   pos_est.chan2_raw = 700;
+ 	   pos_est.chan3_raw = pixhawkVersion;
 
- 	   pos_est.roll=0.23;
- 	   pos_est.pitch=0.23;
- 	   pos_est.yaw=0.0;
+ 	   pos_est.chan4_raw=230;
+ 	   pos_est.chan5_raw=230;
+ 	   pos_est.chan6_raw=0;
     }
 
     if (vicon_message_counter>=11 && vicon_message_counter<=20){
-    	pos_est = target_mocap;
+    	pos_est.time_usec = target_mocap.usec;
+    	pos_est.chan1_raw = target_mocap.x*1000;
+    	pos_est.chan2_raw = target_mocap.y*1000;
+    	pos_est.chan3_raw = target_mocap.z*1000;
     }
-    if (vicon_message_counter>=21 && vicon_message_counter<=30){
-    	attitude_gain.usec = 5;
-    	attitude_gain.x = 0.02;
-    	attitude_gain.y = 0.0;
-    	attitude_gain.z = 0.1;
-    	attitude_gain.roll = 0.02;
-    	attitude_gain.pitch = flipInitialAccel;
-    	attitude_gain.yaw = flipAngVel;
-    	pos_est = attitude_gain;
-    }
+//    if (vicon_message_counter>=21 && vicon_message_counter<=30){
+//    	attitude_gain.usec = 5;
+//    	attitude_gain.x = 0.02;
+//    	attitude_gain.y = 0.0;
+//    	attitude_gain.z = 0.1;
+//    	attitude_gain.roll = 0.02;
+//    	attitude_gain.pitch = flipInitialAccel;
+//    	attitude_gain.yaw = flipAngVel;
+//    	pos_est = attitude_gain;
+//    }
 
 //       printf("---%ld \n\n",pos_est.usec);
 //       printf("%f \t  %f \t  %f \t %f \t  %f \t  %f \n\n",pos_est.x,pos_est.y,pos_est.z,pos_est.pitch,pos_est.roll, pos_est.yaw);
 
        mavlink_message_t message;
 
-       mavlink_msg_vicon_position_estimate_encode(system_id, companion_id, &message, &pos_est);
+       mavlink_msg_hil_rc_inputs_raw_encode(system_id, companion_id, &message, &pos_est);
        vicon_message_counter++;
 //       printf("vicon message Counter: %f",vicon_message_counter);
 
@@ -1101,6 +1108,59 @@ write_thread(void)
 	return;
 
 }
+
+// ------------------------------------------------------------------------------
+//   Process Long Message divide by 1000, cast as float
+// ------------------------------------------------------------------------------
+void
+Autopilot_Interface::
+process_raw_long_mocap(mavlink_hil_rc_inputs_raw_t* raw_mocap_long_value,__mavlink_optitrack_position_estimate_t* mocap_long_value)
+{
+
+	mocap_long_value->usec = raw_mocap_long_value->time_usec;
+	mocap_long_value->x = ((float)raw_mocap_long_value->chan1_raw)/1000;
+	mocap_long_value->y = ((float)raw_mocap_long_value->chan2_raw)/1000;
+	mocap_long_value->z = ((float)raw_mocap_long_value->chan3_raw)/1000; ///< RC channel 3 value, in microseconds
+	mocap_long_value->Vx = ((float)raw_mocap_long_value->chan4_raw)/1000; ///< RC channel 4 value, in microseconds
+	mocap_long_value->Vy = ((float)raw_mocap_long_value->chan5_raw)/1000; ///< RC channel 5 value, in microseconds
+	mocap_long_value->Vz = ((float)raw_mocap_long_value->chan6_raw)/1000; ///< RC channel 6 value, in microseconds
+	mocap_long_value->roll_rel = ((float)raw_mocap_long_value->chan7_raw)/1000; ///< RC channel 7 value, in microseconds
+	mocap_long_value->pitch_rel = ((float)raw_mocap_long_value->chan8_raw)/1000; ///< RC channel 8 value, in microseconds
+	mocap_long_value->yaw_abs = ((float)raw_mocap_long_value->chan9_raw)/1000; ///< RC channel 9 value, in microseconds
+	mocap_long_value->target_x = ((float)raw_mocap_long_value->chan10_raw)/1000; ///< RC channel 10 value, in microseconds
+	mocap_long_value->target_y = ((float)raw_mocap_long_value->chan11_raw)/1000; ///< RC channel 11 value, in microseconds
+	mocap_long_value->target_z = ((float)raw_mocap_long_value->chan12_raw)/1000; ///< RC channel 12 value, in microseconds
+	mocap_long_value->target_yaw_rel = (3.0/2000)*(float)raw_mocap_long_value->rssi; ///< Receive signal strength indicator, 0: 0%, 255: 100%
+	printf("yaw:    %f \n",mocap_long_value->x);
+}
+
+
+// ------------------------------------------------------------------------------
+//   Process Long Message divide by 12000, cast as float
+// ------------------------------------------------------------------------------
+void
+Autopilot_Interface::
+rev_process_float_long_mocap(mavlink_hil_rc_inputs_raw_t* raw_mocap_long_value,__mavlink_optitrack_position_estimate_t* mocap_long_value)
+{
+
+	raw_mocap_long_value->time_usec = mocap_long_value->usec;
+	raw_mocap_long_value->chan1_raw = mocap_long_value->x*1000;
+	raw_mocap_long_value->chan2_raw = mocap_long_value->y*1000;
+	raw_mocap_long_value->chan3_raw = mocap_long_value->z*1000; ///< RC channel 3 value, in microseconds
+	raw_mocap_long_value->chan4_raw = mocap_long_value->Vx*1000; ///< RC channel 4 value, in microseconds
+	raw_mocap_long_value->chan5_raw = mocap_long_value->Vy*1000; ///< RC channel 5 value, in microseconds
+	raw_mocap_long_value->chan6_raw = mocap_long_value->Vz*1000; ///< RC channel 6 value, in microseconds
+	raw_mocap_long_value->chan7_raw = mocap_long_value->roll_rel*1000; ///< RC channel 7 value, in microseconds
+	raw_mocap_long_value->chan8_raw = mocap_long_value->pitch_rel*1000; ///< RC channel 8 value, in microseconds
+	raw_mocap_long_value->chan9_raw = mocap_long_value->yaw_abs*1000; ///< RC channel 9 value, in microseconds
+	raw_mocap_long_value->chan10_raw = mocap_long_value->target_x*1000; ///< RC channel 10 value, in microseconds
+	raw_mocap_long_value->chan11_raw = mocap_long_value->target_y*1000; ///< RC channel 11 value, in microseconds
+//	mocap_long_value->target_z = 1.7;
+	raw_mocap_long_value->chan12_raw = mocap_long_value->target_z*1000; ///< RC channel 12 value, in microseconds
+	raw_mocap_long_value->rssi = mocap_long_value->target_yaw_rel*2000/3; ///< Receive signal strength indicator, 0: 0%, 255: 100%
+	printf("sent rellllllllllllllllllllllllllllllllll yyyyyyyyyyyaw:    %f \n",180/M_PI*(3.0/2000)*(float)raw_mocap_long_value->rssi);
+}
+
 
 // End Autopilot_Interface
 

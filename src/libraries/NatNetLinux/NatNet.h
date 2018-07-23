@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <algorithm>
 
 #include <unistd.h>
 #include <errno.h>
@@ -178,6 +179,15 @@ public:
       return sd;
    }
 };
+
+void DecodeMarkerID(int sourceID, int* pOutEntityID, int* pOutMemberID)
+{
+    if (pOutEntityID)
+        *pOutEntityID = sourceID >> 16;
+
+    if (pOutMemberID)
+        *pOutMemberID = sourceID & 0x0000ffff;
+}
 
 /*!
  * \brief Simple 3D point
@@ -458,19 +468,8 @@ public:
     */
    char const* unpack(char const* data, char nnMajor, char nnMinor)
    {
-      int i;
-      float x,y,z;
-      
       // Rigid body ID
       memcpy(&_id,data,4); data += 4;
-      if (_id!=1){
-//    	  while(1){
-//    	      memcpy(&_loc.x,data,4); data += 2;
-//    	      printf("\nX:%f \n",_loc.x);
-//
-//    	  }
-    	  data+=6;
-      }
       // Location and orientation.
       memcpy(&_loc.x,data,4); data += 4;
       memcpy(&_loc.y,data,4); data += 4;
@@ -480,46 +479,23 @@ public:
       memcpy(&_ori.qz,data,4); data += 4;
       memcpy(&_ori.qw,data,4); data += 4;
 
-      if( nnMajor <= 2 ){
-		  // Associated markers
-		  int nMarkers = 0;
-		  memcpy(&nMarkers,data,4); data += 4;
-		  for( i = 0; i < nMarkers; ++i )
-		  {
-			 memcpy(&x,data,4); data += 4;
-			 memcpy(&y,data,4); data += 4;
-			 memcpy(&z,data,4); data += 4;
-			 _markers.push_back(Point3f(x,y,z));
-		  }
+	  if( nnMajor >= 2 )
+	  {
+		// Mean marker error
+		memcpy(&_mErr,data,4); data += 4;
+		printf(KMAG "Mean marker error: %.4e%s\n", _mErr,KNRM);
 
-		  if( nnMajor >= 2 )
-		  {
-			 // Marker IDs
-			 uint32_t id = 0;
-			 for( i = 0; i < nMarkers; ++i )
-			 {
-				memcpy(&id,data,4); data += 4;
-				_mId.push_back(id);
-			 }
-
-			 // Marker sizes
-			 float size;
-			 for( i = 0; i < nMarkers; ++i )
-			 {
-				memcpy(&size,data,4); data += 4;
-				_mSize.push_back(size);
-			 }
-
-			 if( ((nnMajor==2) && (nnMinor >= 6)) || (nnMajor > 2) || (nnMajor == 0) )
-			 {
-				uint16_t tmp;
-				memcpy(&tmp, data, 2); data += 2;
-				_trackingValid = tmp & 0x01;
-			 }
-			 // Mean marker error
-			 memcpy(&_mErr,data,4); data += 4;
-		  }
-      }
+	  }
+	 if( ((nnMajor==2) && (nnMinor >= 6)) || (nnMajor > 2) || (nnMajor == 0) )
+	 {
+		uint16_t tmp;
+		memcpy(&tmp, data, 2); data += 2;
+		_trackingValid = tmp & 0x01;
+		if (!_trackingValid){
+			printf("%sNot tracking body %d...%s\n",KRED,_id,KNRM);
+			printf("%sNot tracking body %d...%s\n",KRED,_id,KNRM);
+		}
+	 }
 
       return data;
    }
@@ -712,7 +688,10 @@ public:
    LabeledMarker() :
       _id(0),
       _p(),
-      _size(0.f)
+      _size(0.f),
+	  _residual(0),
+	  _modelID(0),
+	  _hasModel(0)
    {
    }
    
@@ -720,9 +699,12 @@ public:
    
    //! \brief Copy constructor.
    LabeledMarker( LabeledMarker const& other ) :
-      _id(other._id),
-      _p(other._p),
-      _size(other._size)
+		_id(other._id),
+		_p(other._p),
+		_size(other._size),
+		_residual(other._residual),
+		_modelID(other._modelID),
+   	   	_hasModel(other._hasModel)
    {
    }
    
@@ -732,6 +714,9 @@ public:
       _id = other._id;
       _p = other._p;
       _size = other._size;
+      _residual = other._residual;
+      _modelID = other._modelID;
+      _hasModel= other._hasModel;
       return *this;
    }
    
@@ -741,6 +726,8 @@ public:
    Point3f location() const { return _p; }
    //! \brief Size of this marker.
    float size() const { return _size; }
+   //! \brief Size of this marker.
+   bool hasModel() const { return _hasModel; }
    
    /*!
     * \brief Unpack the marker from packed data.
@@ -748,14 +735,51 @@ public:
     * \param data pointer to packed data representing a labeled marker
     * \returns pointer to data immediately following the labeled marker data
     */
-   char const* unpack( char const* data )
+   char const* unpack( char const* data , unsigned char _nnMajor, unsigned char _nnMinor)
    {
-      memcpy(&_id,data,4); data += 4;
-      memcpy(&_p.x,data,4); data += 4;
-      memcpy(&_p.y,data,4); data += 4;
-      memcpy(&_p.z,data,4); data += 4;
-      memcpy(&_size,data,4); data += 4;
-      
+	   int ID = 0; memcpy(&ID, data, 4); data += 4;
+	   int modelID, markerID;
+	   DecodeMarkerID(ID, &_modelID, &_id);
+	   // x
+	   memcpy(&_p.x, data, 4); data += 4;
+	   // y
+	   memcpy(&_p.y, data, 4); data += 4;
+	   // z
+	   memcpy(&_p.z, data, 4); data += 4;
+	   // size
+	   memcpy(&_size, data, 4); data += 4;
+
+	   // NatNet version 2.6 and later
+	   if( ((_nnMajor == 2)&&(_nnMinor >= 6)) || (_nnMajor > 2) || (_nnMajor == 0) )
+	   {
+		   // marker params
+		   short params = 0; memcpy(&params, data, 2); data += 2;
+		   bool bOccluded = (params & 0x01) != 0;     // marker was not visible (occluded) in this frame
+		   bool bPCSolved = (params & 0x02) != 0;     // position provided by point cloud solve
+		   bool bModelSolved = (params & 0x04) != 0;  // position provided by model solve
+		   if ((_nnMajor >= 3) || (_nnMajor == 0))
+		   {
+			   _hasModel = (params & 0x08) != 0;     // marker has an associated model
+			   bool bUnlabeled = (params & 0x10) != 0;    // marker is an unlabeled marker
+			   bool bActiveMarker = (params & 0x20) != 0; // marker is an active marker
+		   }
+
+
+	   }
+
+
+	   // NatNet version 3.0 and later
+	   if ((_nnMajor >= 3) || (_nnMajor == 0))
+	   {
+		   // Marker residual
+		   memcpy(&_residual, data, 4); data += 4;
+	   }
+
+//	   printf("ID  : [MarkerID: %d] [ModelID: %d]\n", _id, _modelID);
+//	   printf("pos : [%3.2f,%3.2f,%3.2f]\n", _p.x,_p.y,_p.z);
+//	   printf("size: [%.4e]\n", _size);
+//	   printf("err:  [%.4e]\n", _residual);
+
       return data;
    }
    
@@ -763,6 +787,9 @@ private:
    int _id;
    Point3f _p;
    float _size;
+   float _residual;
+   int _modelID;
+   bool _hasModel;
 };
 
 /*!
@@ -838,6 +865,7 @@ public:
     * Dustin Jakes at NaturalPoint says this is undefined in live capture mode,
     * and is the actual frame number in playback mode.
     */
+public:
    int frameNum() const { return _frameNum; }
    //! \brief All the sets of markers except unidentified ones.
    std::vector<MarkerSet> const& markerSets() const { return _markerSet; }
@@ -845,6 +873,16 @@ public:
    std::vector<Point3f> const& unIdMarkers() const { return _uidMarker; }
    //! \brief All the rigid bodies.
    std::vector<RigidBody> const& rigidBodies() const { return _rBodies; }
+   //! \brief All the labeled markers.
+   std::vector<LabeledMarker> const& labledMarkers() const { return _labeledMarkers; }
+   //! \brief All the labeled markers without a model.
+   std::vector<LabeledMarker> labledModellessMarkers() const {
+	   std::vector<LabeledMarker> _labeledModellessMarkers(labledMarkers().size());
+	   auto it = std::copy_if (_labeledMarkers.begin(), _labeledMarkers.end(), _labeledModellessMarkers.begin(), [](LabeledMarker lm){return !lm.hasModel();} );
+	   _labeledModellessMarkers.resize(std::distance(_labeledModellessMarkers.begin(),it));  // shrink container to new size
+	   return _labeledModellessMarkers;
+   }
+
    /*!
     * \brief Either latency or timecode for the current frame.
     * 
@@ -900,6 +938,7 @@ public:
     */
    char const* unpack(char const* data)
    {
+	  char const* ptrOrigNatNetLin = data - 4;
       int i;
       int numUidMarkers;
       float x,y,z;
@@ -919,6 +958,10 @@ public:
          MarkerSet set;
          data = set.unpack(data);
          _markerSet.push_back(set);
+         std::vector <Point3f>  theseMarkers = set.markers();
+         for (int iii = 0; iii< theseMarkers.size(); iii++){
+//        	 cout<<"x: "<<theseMarkers[iii].x<<"\t"<<"y: "<<theseMarkers[iii].y<<"\t"<<"z: "<<theseMarkers[iii].z<<endl;
+         }
       }
       
       // Get unidentified markers.
@@ -943,32 +986,87 @@ public:
          _rBodies.push_back(b);
       }
 //
-//      // Get skeletons (NatNet 2.1 and later)
-//      if( _nnMajor > 2 || (_nnMajor==2 && _nnMinor >= 1) )
-//      {
-//         int numSkel = 0;
-//         memcpy(&numSkel,data,4); data += 4;
-//         for( i = 0; i < numSkel; ++i )
-//         {
-//            Skeleton s;
-//            data = s.unpack( data, _nnMajor, _nnMinor );
-//            _skel.push_back(s);
-//         }
-//      }
-//
-//      // Get labeled markers (NatNet 2.3 and later)
-//      if( _nnMajor > 2 || (_nnMajor==2 && _nnMinor >= 3) )
-//      {
-//         int numLabMark = 0;
-//         memcpy(&numLabMark,data,4); data += 4;
-//         for( i = 0; i < numLabMark; ++i )
-//         {
-//            LabeledMarker lm;
-//            data = lm.unpack(data);
-//            _labeledMarkers.push_back(lm);
-//         }
-//      }
-//
+      // Skeletons (NatNet version 2.1 and later)
+      if( ((_nnMajor == 2)&&(_nnMinor>0)) || (_nnMajor>2))
+      {
+          int nSkeletons = 0;
+
+          memcpy(&nSkeletons, data, 4); data += 4;
+          printf("Skeleton Count : %d\n", nSkeletons);
+
+          // Loop through skeletons
+          for (int j=0; j < nSkeletons; j++)
+          {
+              // skeleton id
+              int skeletonID = 0;
+              memcpy(&skeletonID, data, 4); data += 4;
+
+              // Number of rigid bodies (bones) in skeleton
+              int nRigidBodies = 0;
+              memcpy(&nRigidBodies, data, 4); data += 4;
+              printf("Rigid Body Count : %d\n", nRigidBodies);
+
+              // Loop through rigid bodies (bones) in skeleton
+              for (int j=0; j < nRigidBodies; j++)
+              {
+                  // Rigid body position and orientation
+                  int ID = 0; memcpy(&ID, data, 4); data += 4;
+                  float x = 0.0f; memcpy(&x, data, 4); data += 4;
+                  float y = 0.0f; memcpy(&y, data, 4); data += 4;
+                  float z = 0.0f; memcpy(&z, data, 4); data += 4;
+                  float qx = 0; memcpy(&qx, data, 4); data += 4;
+                  float qy = 0; memcpy(&qy, data, 4); data += 4;
+                  float qz = 0; memcpy(&qz, data, 4); data += 4;
+                  float qw = 0; memcpy(&qw, data, 4); data += 4;
+                  printf("ID : %d\n", ID);
+                  printf("pos: [%3.2f,%3.2f,%3.2f]\n", x,y,z);
+                  printf("ori: [%3.2f,%3.2f,%3.2f,%3.2f]\n", qx,qy,qz,qw);
+
+                  // Mean marker error (NatNet version 2.0 and later)
+                  if(_nnMajor >= 2)
+                  {
+                      float fError = 0.0f; memcpy(&fError, data, 4); data += 4;
+                      printf("Mean marker error: %3.2f\n", fError);
+                  }
+
+                  // Tracking flags (NatNet version 2.6 and later)
+                  if( ((_nnMajor == 2)&&(_nnMinor >= 6)) || (_nnMajor > 2) || (_nnMajor == 0) )
+                  {
+                      // params
+                      short params = 0; memcpy(&params, data, 2); data += 2;
+                      bool bTrackingValid = params & 0x01; // 0x01 : rigid body was successfully tracked in this frame
+                  }
+
+              } // next rigid body
+
+          } // next skeleton
+      }
+
+		// labeled markers (NatNet version 2.3 and later)
+		if (((_nnMajor == 2) && (_nnMinor >= 3)) || (_nnMajor > 2)) {
+			int nLabeledMarkers = 0;
+			memcpy(&nLabeledMarkers, data, 4);
+			data += 4;
+			printf("Labeled Marker Count : %d\n", nLabeledMarkers);
+
+			// Loop through labeled markers
+			for (int j = 0; j < nLabeledMarkers; j++) {
+				// id
+				// Marker ID Scheme:
+				// Active Markers:
+				//   ID = ActiveID, correlates to RB ActiveLabels list
+				// Passive Markers:
+				//   If Asset with Legacy Labels
+				//      AssetID 	(Hi Word)
+				//      MemberID	(Lo Word)
+				//   Else
+				//      PointCloud ID
+				LabeledMarker lm;
+				data = lm.unpack(data, _nnMajor, _nnMinor);
+				_labeledMarkers.push_back(lm);
+
+			}
+		}
 //      // Get latency/timecode
 //      memcpy(&_latency,data,4); data += 4;
 //

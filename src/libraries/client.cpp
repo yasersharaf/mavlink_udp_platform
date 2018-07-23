@@ -172,7 +172,7 @@ int Client::read_message(mavlink_message_t &message) {
         if ( (lastStatus.packet_rx_drop_count != status.packet_rx_drop_count)  )
         {
 //            printf("ERROR: DROPPED %d PACKETS\n", status.packet_rx_drop_count);
-            unsigned char v=cp;
+//            unsigned char v=cp;
 //            fprintf(stderr,"%02x ", v);
         }
         lastStatus = status;
