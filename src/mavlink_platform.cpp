@@ -96,13 +96,25 @@ float wrap180(float x){
     return x - 180;
 }
 
-float wrapPi(float x){
-	x = 180*x/M_PI;
-    x = fmod(x + 180,360);
-    if (x < 0)
-        x += 360;
-    return (x*M_PI/180-1);
+float wrapPi(float angle){
+	while (angle > M_PI)
+	    angle -= 2*M_PI;
+
+	while (angle < -M_PI)
+	    angle += 2*M_PI;
+    return angle;
 }
+
+float wrap2Pi(float angle){
+	while (angle > 2*M_PI)
+	    angle -= 2*M_PI;
+
+	while (angle < 0)
+	    angle += 2*M_PI;
+    return angle;
+}
+
+
 
 // End the program gracefully.
 void terminate(int) {
@@ -173,6 +185,13 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 	float targetX = 0;
 	float targetY = 0;
 	float targetZ = 0;
+
+	float targetVX = 0;
+	float targetVY = 0;
+	float targetVZ = 0;
+	float targetVHorizon = 0;
+
+
 	float targetYaw = 0;
 	float targetYaw_rel = 0;
 
@@ -379,55 +398,67 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 
 			api[api_ctr].current_mocap_long_value.Vx = api[api_ctr].filtVx;
 			api[api_ctr].current_mocap_long_value.Vy  = api[api_ctr].filtVy;
-			api[api_ctr].current_mocap_long_value.Vz =  0.2*api[api_ctr].current_mocap_long_value.Vz   + 0.8*api[api_ctr].noisyVz;
+			api[api_ctr].current_mocap_long_value.Vz =  0.7*api[api_ctr].current_mocap_long_value.Vz   + 0.3*api[api_ctr].noisyVz;
 
 			api[api_ctr].smoothVx = api[api_ctr].smoothVx*0.97+0.03*api[api_ctr].filtVx;
 			api[api_ctr].smoothVy = api[api_ctr].smoothVy*0.97+0.03*api[api_ctr].filtVy;
+			if (wrapPi(yaw - M_PI)<0.1){
+				api[api_ctr].quadFiltRoll  = api[api_ctr].quadFiltRoll *0.97+ 0.03*api[api_ctr].received_mocap_long_value.Vx;
+				api[api_ctr].quadFiltPitch = api[api_ctr].quadFiltPitch*0.97+ 0.03*api[api_ctr].received_mocap_long_value.Vy;
 
-			api[api_ctr].quadFiltRoll  = api[api_ctr].quadFiltRoll *0.97+ 0.03*api[api_ctr].received_mocap_long_value.Vx;
-			api[api_ctr].quadFiltPitch = api[api_ctr].quadFiltPitch*0.97+ 0.03*api[api_ctr].received_mocap_long_value.Vy;
-
-			api[api_ctr].mocapAccelRealTimeX = std::atan((api[api_ctr].smoothVx_prev-api[api_ctr].smoothVx)*120/9.81);
-			api[api_ctr].mocapAccelRealTimeY = std::atan((api[api_ctr].smoothVy-api[api_ctr].smoothVy_prev)*120/9.81);
-
-			if(!thereIsAThrowable){
-			api[api_ctr].current_mocap_long_value.target_x = 0.25*targetX + 0.75* api[api_ctr].current_mocap_long_value.target_x;
-			api[api_ctr].current_mocap_long_value.target_y = 0.25*targetY + 0.75* api[api_ctr].current_mocap_long_value.target_y;
-			api[api_ctr].current_mocap_long_value.target_z = 0.25*targetZ + 0.75* api[api_ctr].current_mocap_long_value.target_z;
-
-			cout<<"actual    "<<yaw<<"          target: "<<targetYaw<<"   diff   "<< (targetYaw+M_PI-yaw)*180/M_PI<<endl;
-			api[api_ctr].current_mocap_long_value.target_yaw_rel = 0.25*constrain_float((targetYaw+M_PI-yaw),-0.18,0.18) + 0.75* api[api_ctr].current_mocap_long_value.target_yaw_rel;
+				api[api_ctr].mocapAccelRealTimeX = std::atan((api[api_ctr].smoothVx_prev-api[api_ctr].smoothVx)*120/9.81);
+				api[api_ctr].mocapAccelRealTimeY = std::atan((api[api_ctr].smoothVy-api[api_ctr].smoothVy_prev)*120/9.81);
 			}
+			else{
+				api[api_ctr].quadFiltRoll  = 0;
+				api[api_ctr].quadFiltPitch = 0;
 
-			fprintf (stderr, "\n\n ======   %f========> ======   %f========>  Tracking Mode  =======  %f=======> ======   %f========> \n\n\n",api[api_ctr].current_mocap_long_value.target_x,api[api_ctr].current_mocap_long_value.target_y,targetX,targetY);
+				api[api_ctr].mocapAccelRealTimeX = 0;
+				api[api_ctr].mocapAccelRealTimeY = 0;
+			}
+			if(!thereIsAThrowable){
+				api[api_ctr].current_mocap_long_value.target_x = 0.8*targetX + 0.2* api[api_ctr].current_mocap_long_value.target_x;
+				api[api_ctr].current_mocap_long_value.target_y = 0.8*targetY + 0.2* api[api_ctr].current_mocap_long_value.target_y;
+				api[api_ctr].current_mocap_long_value.target_z = 0.8*targetZ + 0.2* api[api_ctr].current_mocap_long_value.target_z;
+
+				cout<<"actual    "<<yaw<<"          target: "<<targetYaw<<"   diff   "<< (targetYaw+M_PI-yaw)*180/M_PI<<endl;
+				api[api_ctr].current_mocap_long_value.target_yaw_rel = 0.25*constrain_float((targetYaw+M_PI-yaw),-0.18,0.18) + 0.75* api[api_ctr].current_mocap_long_value.target_yaw_rel;
+			}
 
 
 			if (readFromMocapCounter>1000 && abs(api[api_ctr].received_mocap_long_value.Vz + 2)< 1e-2){
 				api[api_ctr].quad_roll_offset  = constrain_float(-(-api[api_ctr].mocapAccelRealTimeX +  api[api_ctr].quadFiltRoll),-0.05,0.05);
 				api[api_ctr].quad_pitch_offset = constrain_float(-(-api[api_ctr].mocapAccelRealTimeY + api[api_ctr].quadFiltPitch),-0.05,0.05);
-//				api[api_ctr].mocap_roll_offset = 0.0;
-//				api[api_ctr].mocap_pitch_offset = 0.0;
-//
-//				api[api_ctr].quad_roll_offset  = 0.0;
-//				api[api_ctr].quad_pitch_offset = 0.0;
-//
+
+				api[api_ctr].current_mocap_long_value.roll_rel  = api[api_ctr].quad_roll_offset;
+				api[api_ctr].current_mocap_long_value.pitch_rel = api[api_ctr].quad_pitch_offset;
 //
 //				api[api_ctr].quad_roll_offset  = api[api_ctr].quad_roll_offset*0.5 + 0.1*(roll -api[api_ctr].mocap_roll_offset   +  api[api_ctr].received_mocap_long_value.x);
 //				api[api_ctr].quad_pitch_offset = api[api_ctr].quad_pitch_offset*0.9+ 0.1*(pitch - api[api_ctr].mocap_pitch_offset + api[api_ctr].received_mocap_long_value.roll);
-				printf("\n\t\t\t\t\t\t\t\t\t\t\tfilt: %d , %f \n", readFromMocapCounter, 2.34235252354353453453);
+				printf("\n\t\t\t\t\t\t\t\t\t\t\tfilt: %d , %f \n", readFromMocapCounter, api[api_ctr].received_mocap_long_value.Vz);
 
 			}
 			else if (abs(api[api_ctr].received_mocap_long_value.Vz + 5)<1e-2){
-
-
 				fprintf (stderr, "\n\n ======   %f========> ======   %f========>  Tracking Mode  =======  %f=======> ======   %f========> \n\n\n",api[api_ctr].current_mocap_long_value.target_x,api[api_ctr].current_mocap_long_value.target_y,api[api_ctr].received_mocap_long_value.y,api[api_ctr].received_mocap_long_value.z);
+				api[api_ctr].quad_roll_offset = 0;
+				api[api_ctr].quad_pitch_offset = 0;
+
+			}
+			else if (abs(api[api_ctr].received_mocap_long_value.Vz + 6)<1e-2){
+				api[api_ctr].current_mocap_long_value.roll_rel  = targetVZ;
+				api[api_ctr].current_mocap_long_value.pitch_rel = targetVHorizon;
+				api[api_ctr].quad_roll_offset = 0;
+				api[api_ctr].quad_pitch_offset = 0;
+
+				fprintf (stderr, "\n\n ======   %f========> ======   %f========>  BAAAALLLLLLL Mode  =======  %f=======> ======   %f========> \n\n\n",api[api_ctr].current_mocap_long_value.target_x,api[api_ctr].current_mocap_long_value.target_y,api[api_ctr].received_mocap_long_value.y,api[api_ctr].received_mocap_long_value.z);
 
 
 			}
 
 
 			else{
-				printf("\n\t\t\t\t\t\t\t\t\t\t\tno filt: %d , %f  \n",readFromMocapCounter,abs(api[api_ctr].received_mocap_long_value.Vz + 2));
+				cout<<"received_mocap_long_value.Vz: "<<api[api_ctr].received_mocap_long_value.Vz<<endl;
+				printf("\n\t\t\t\t\t\t\t\t\t\t\tno filt: %d , %f  \n",readFromMocapCounter,(api[api_ctr].received_mocap_long_value.Vz ));
 			}
 			cout<<"preprocess: "<<api[api_ctr].quad_roll_offset<<"\t"<<api[api_ctr].quad_pitch_offset<<"\n";
 
@@ -435,14 +466,16 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 			cout<<"postprocess: "<<api[api_ctr].quad_roll_offset<<"\t"<<api[api_ctr].quad_pitch_offset<<"\n";
 
 			if (thereIsAThrowable){
-				api[api_ctr].current_mocap_long_value.roll_rel  = (targetZ - api[api_ctr].current_mocap_long_value.target_z)/dt2;
+				targetVZ  = (targetZ - api[api_ctr].current_mocap_long_value.target_z)/dt2;
 				cout<<"targetZ: "<<targetZ<<"\t"<<api[api_ctr].current_mocap_long_value.target_z<<endl;
-				api[api_ctr].current_mocap_long_value.pitch_rel = sqrtf(((targetX - api[api_ctr].current_mocap_long_value.target_x)/dt2)*((targetX - api[api_ctr].current_mocap_long_value.target_x)/dt2)+((targetY - api[api_ctr].current_mocap_long_value.target_y)/dt2)*((targetY - api[api_ctr].current_mocap_long_value.target_y)/dt2));
+				targetVX = (targetX - api[api_ctr].current_mocap_long_value.target_x)/dt2;
+				targetVY = (targetY - api[api_ctr].current_mocap_long_value.target_y)/dt2;
+				targetVHorizon = sqrtf(targetVX*targetVX+targetVY*targetVY);
 
 				api[api_ctr].current_mocap_long_value.target_x  = targetX;
 				api[api_ctr].current_mocap_long_value.target_y  = targetY;
 				api[api_ctr].current_mocap_long_value.target_z  = targetZ;
-				printf("Throwale info:  %.2e %.2e x = %.2e y = %.2e z= %.2e\n ",api[api_ctr].current_mocap_long_value.roll_rel,api[api_ctr].current_mocap_long_value.pitch_rel,
+				printf("Throwale info:  %.2e %.2e x = %.2e y = %.2e z= %.2e\n ",targetVZ,targetVHorizon,
 						api[api_ctr].current_mocap_long_value.target_x,api[api_ctr].current_mocap_long_value.target_y,api[api_ctr].current_mocap_long_value.target_z);
 			}
 			logFile<<api_ctr<<"\t"<<api[api_ctr].received_mocap_long_value.usec<<"\t"<<api[api_ctr].received_mocap_long_value.x<<"\t"<<api[api_ctr].received_mocap_long_value.y<<"\t"<<api[api_ctr].received_mocap_long_value.z<<"\t"<<api[api_ctr].received_mocap_long_value.Vx<<"\t"<<api[api_ctr].received_mocap_long_value.Vy<<"\t"<<api[api_ctr].received_mocap_long_value.Vz
@@ -459,7 +492,8 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 					<<"\t"<<api[api_ctr].received_mocap_long_value.roll_rel<<"\t"<<api[api_ctr].received_mocap_long_value.pitch_rel<<"\t"<<api[api_ctr].received_mocap_long_value.yaw_abs
 					<<"\t"<<api[api_ctr].received_mocap_long_value.target_x<<"\t"<<api[api_ctr].received_mocap_long_value.target_y<<"\t"<<api[api_ctr].received_mocap_long_value.target_z
 					<<"\t"<<api[api_ctr].current_mocap_long_value.roll_rel<<"\t"<<api[api_ctr].current_mocap_long_value.pitch_rel<<"\t"<<api[api_ctr].current_mocap_long_value.yaw_abs
-					<<"\t"<<api[api_ctr].current_mocap_long_value.target_x<<"\t"<<api[api_ctr].current_mocap_long_value.target_y<<"\t"<<api[api_ctr].current_mocap_long_value.target_z<<"\n";
+					<<"\t"<<api[api_ctr].current_mocap_long_value.target_x<<"\t"<<api[api_ctr].current_mocap_long_value.target_y<<"\t"<<api[api_ctr].current_mocap_long_value.target_z
+					<<"\t"<<targetVHorizon<<"\t"<<targetVZ<<"\n";
 //			std::cout<<"apival:"<<api_ctr<<"\t"<<api[api_ctr].received_mocap_long_value.usec<<"\t"<<api[api_ctr].received_mocap_long_value.x<<"\t"<<api[api_ctr].received_mocap_long_value.y<<"\t"<<api[api_ctr].received_mocap_long_value.z<<"\t"<<api[api_ctr].received_mocap_long_value.roll<<"\t"<<api[api_ctr].received_mocap_long_value.pitch<<"\t"<<api[api_ctr].received_mocap_long_value.yaw<<"\t"<<"\n";
 			api[api_ctr].previous_mocap_long_value = api[api_ctr].current_mocap_long_value;
 			api[api_ctr].smoothVx_prev = api[api_ctr].smoothVx;
@@ -495,7 +529,7 @@ void printFrames(FrameListener& frameListener,std::vector<Autopilot_Interface>& 
 			targetZ =  constrain_float((3*sinf(pitch) + rBodies[api.size()].location().y),0.8,2.0);
 			targetYaw = yaw;
 
-			cout<<"yaw:   "<<yaw<<"    target x: "<<targetX<<"    target y: "<<targetY<<"        locXXXX:"<<rBodies[api.size()].location().z<<"        locYYYY:"<<rBodies[api.size()].location().x<<endl;
+//			cout<<"yaw:   "<<yaw<<"    target x: "<<targetX<<"    target y: "<<targetY<<"        locXXXX:"<<rBodies[api.size()].location().z<<"        locYYYY:"<<rBodies[api.size()].location().x<<endl;
 			int api_ctr = api.size();
 		}
 		frameNum_prev = frameNum;
@@ -622,7 +656,7 @@ int top(int argc, char **argv) {
 	 */
 
 //	client.open_connection();
-	autopilot_interfaces[0].set_position_vicon_message( 0.0,  0.0, 1.7);
+	autopilot_interfaces[0].set_position_vicon_message( -1.0,  -1.0, 1.2);
 //	autopilot_interfaces[1].set_position_vicon_message( 0.0,  0.0, 2.0);
 //	autopilot_interfaces[2].set_position_vicon_message(0.75 ,-2.5, 1.7);
 

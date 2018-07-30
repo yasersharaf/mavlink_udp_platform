@@ -661,7 +661,7 @@ write_mocap_floats()
 
     if (vicon_message_counter<=10){
  	   pos_est.time_usec = 2;
- 	   pos_est.chan1_raw = 1800;
+ 	   pos_est.chan1_raw = 1200;
  	   pos_est.chan2_raw = 700;
  	   pos_est.chan3_raw = pixhawkVersion;
 
@@ -1126,12 +1126,11 @@ process_raw_long_mocap(mavlink_hil_rc_inputs_raw_t* raw_mocap_long_value,__mavli
 	mocap_long_value->Vz = ((float)raw_mocap_long_value->chan6_raw)/1000; ///< RC channel 6 value, in microseconds
 	mocap_long_value->roll_rel = ((float)raw_mocap_long_value->chan7_raw)/1000; ///< RC channel 7 value, in microseconds
 	mocap_long_value->pitch_rel = ((float)raw_mocap_long_value->chan8_raw)/1000; ///< RC channel 8 value, in microseconds
-	mocap_long_value->yaw_abs = ((float)raw_mocap_long_value->chan9_raw)/1000; ///< RC channel 9 value, in microseconds
-	mocap_long_value->target_x = ((float)raw_mocap_long_value->chan10_raw)/1000; ///< RC channel 10 value, in microseconds
+	mocap_long_value->yaw_abs = ((float)raw_mocap_long_value->chan9_raw)/100; ///< RC channel 9 value, in microseconds
+	mocap_long_value->target_x = ((float)raw_mocap_long_value->chan10_raw)/100; ///< RC channel 10 value, in microseconds
 	mocap_long_value->target_y = ((float)raw_mocap_long_value->chan11_raw)/1000; ///< RC channel 11 value, in microseconds
 	mocap_long_value->target_z = ((float)raw_mocap_long_value->chan12_raw)/1000; ///< RC channel 12 value, in microseconds
 	mocap_long_value->target_yaw_rel = (3.0/2000)*(float)raw_mocap_long_value->rssi; ///< Receive signal strength indicator, 0: 0%, 255: 100%
-	printf("yaw:    %f \n",mocap_long_value->x);
 }
 
 
@@ -1158,7 +1157,6 @@ rev_process_float_long_mocap(mavlink_hil_rc_inputs_raw_t* raw_mocap_long_value,_
 //	mocap_long_value->target_z = 1.7;
 	raw_mocap_long_value->chan12_raw = mocap_long_value->target_z*1000; ///< RC channel 12 value, in microseconds
 	raw_mocap_long_value->rssi = mocap_long_value->target_yaw_rel*2000/3; ///< Receive signal strength indicator, 0: 0%, 255: 100%
-	printf("sent rellllllllllllllllllllllllllllllllll yyyyyyyyyyyaw:    %f \n",180/M_PI*(3.0/2000)*(float)raw_mocap_long_value->rssi);
 }
 
 
